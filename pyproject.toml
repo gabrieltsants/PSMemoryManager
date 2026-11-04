@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "psmemorymanager"
+version = "0.1.0"
+description = "PS2 memory card manager (PSxMemCard Gen2, OPL, PCSX2, MemCard PRO2) - web and command line"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+requires-python = ">=3.10"
+dependencies = ["mymcplusplus==3.2.0"]
+
+[project.optional-dependencies]
+dev = ["pytest", "playwright"]
+
+[project.scripts]
+psmm = "psmm.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["psmm*"]
+
+[tool.setuptools.package-data]
+psmm = ["data/*.json", "data/*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+# tests create several 64 MB cards; keep temp dirs only for failed tests
+tmp_path_retention_policy = "failed"

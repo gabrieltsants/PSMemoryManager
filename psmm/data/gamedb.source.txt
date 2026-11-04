@@ -1,0 +1,3 @@
+Generated 2026-11-04 by tools/update_gamedb.py from https://raw.githubusercontent.com/PCSX2/pcsx2/master/bin/resources/GameIndex.yaml
+PCSX2 GameIndex.yaml (PCSX2 is GPL-3.0). Game data credits: sonyindex, serialstation,
+psxdatacenter, redump. Entries: 12695
