@@ -18,7 +18,8 @@ Um **gerenciador de memory cards de PlayStation 2 e PlayStation 1 que roda no na
 - **Transferir saves:** abra dois cartões lado a lado e arraste os saves de um para o outro.
 - **Fazer backup e restaurar saves:** exporte saves para arquivos e importe-os de novo, no mesmo cartão ou em outro.
 - **Fazer uma limpeza:** apague saves, pastas e arquivos. Toda alteração pode ser desfeita até você salvar. Nos cartões de PS1, um save apagado pode até ser restaurado depois, como no console.
-- **Converter cartões** entre aparelhos e emuladores, mudar o tamanho de cartões de PS2, juntar cartões ou separar um cartão em um cartão por jogo.
+- **Redimensionar cartões existentes:** aumente ou diminua um cartão de PS2 (de 1 a 64 MB) sem perder nada. Cada save mantém as datas e os atributos, e funciona também nos cartões do cartão SD.
+- **Converter cartões** entre aparelhos e emuladores, juntar cartões ou separar um cartão em um cartão por jogo.
 - **Gerenciar o cartão SD do PSxMemCard Gen2 / SD2PSX:** veja todos os cartões e canais, abra e salve direto no SD, crie novos, dê nome aos canais e altere as configurações do aparelho.
 - **Verificar um cartão** em busca de erros.
 

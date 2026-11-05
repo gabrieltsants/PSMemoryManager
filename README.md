@@ -18,7 +18,8 @@ A **PlayStation 2 and PlayStation 1 memory card manager that runs in your browse
 - **Move saves around:** open two cards side by side and drag saves from one to the other.
 - **Back up and restore saves:** export saves to files and import them again, on the same card or another one.
 - **Clean up:** delete saves, folders and files. Every change can be undone until you save. On PS1 cards, a deleted save can even be restored later, like on the console.
-- **Convert cards** between devices and emulators, change the size of PS2 cards, merge cards, or split a card into one card per game.
+- **Resize existing cards:** make a PS2 card bigger or smaller (1 to 64 MB) without losing anything. Every save keeps its dates and attributes, and it works on cards on the SD card too.
+- **Convert cards** between devices and emulators, merge cards, or split a card into one card per game.
 - **Manage a PSxMemCard Gen2 / SD2PSX SD card:** see every card and channel, open and save them straight on the SD card, create new ones, name channels and change the device settings.
 - **Check a card** for errors.
 
