@@ -46,6 +46,7 @@ const STRINGS = {
     "empty.fact1": "<b>Everything runs in your browser.</b> No file is uploaded to a server.",
     "empty.fact2": "Works with PSxMemCard Gen2 / SD2PSX, OPL (VMC), PCSX2 and MemCard PRO2, plus PS1 cards from DexDrive, PSP/PS Vita and emulators.",
     "empty.fact3": "Automatically detects cards with and without ECC.",
+    "empty.fact4": "<b>Open source</b> (GPLv3): the code is on <a href=\"https://github.com/gabrieltsants/PSMemoryManager\" target=\"_blank\" rel=\"noopener\">GitHub</a>.",
 
     "card.unsaved": "● unsaved", "card.unsaved.tip": "Unsaved changes",
     "card.used": "{used} used", "card.free": "{free} free of {total}",
@@ -356,6 +357,7 @@ const STRINGS = {
     "empty.fact1": "<b>Tudo roda no seu navegador.</b> Nenhum arquivo é enviado para servidor.",
     "empty.fact2": "Compatível com PSxMemCard Gen2 / SD2PSX, OPL (VMC), PCSX2 e MemCard PRO2, além de cartões de PS1 do DexDrive, PSP/PS Vita e emuladores.",
     "empty.fact3": "Detecta automaticamente cartões com e sem ECC.",
+    "empty.fact4": "<b>Código aberto</b> (GPLv3): o código está no <a href=\"https://github.com/gabrieltsants/PSMemoryManager\" target=\"_blank\" rel=\"noopener\">GitHub</a>.",
 
     "card.unsaved": "● não salvo", "card.unsaved.tip": "Alterações não salvas",
     "card.used": "{used} usados", "card.free": "{free} livres de {total}",
