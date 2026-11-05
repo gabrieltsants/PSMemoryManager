@@ -493,3 +493,70 @@ dialog.wide { width: min(980px, calc(100vw - 32px)); max-width: none; }
   .as-where { grid-column: 1 / -1; grid-row: 2; }
   .as-size { display: none; }
 }
+
+/* compare two cards (side-by-side view) */
+.cmp-bar { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--accent-soft); font-size: 13px; }
+.cmp-bar .cmp-sum { flex: 1 1 260px; min-width: 0; }
+.cmp-bar .btn.small { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 13px; }
+.cmp-bar .btn.small svg { width: 15px; height: 15px; }
+.cmp { flex: none; margin-right: 6px; vertical-align: 1px; font-size: 11px; line-height: 16px; padding: 0 7px; border-radius: 99px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+.cmp-only { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
+.cmp-newer { color: var(--ok); border-color: var(--ok); }
+.cmp-older, .cmp-diff { color: var(--warn); border-color: var(--warn); }
+
+/* --- tight spaces: narrow card panes, short screens, folded SD list ------
+   Large screens keep the usual look; these only kick in when space runs out. */
+.pane { container: pane / inline-size; }
+.cmp.in-name { display: none; margin: 0 0 0 4px; }
+/* a pane too narrow for four columns: drop the date, then the title */
+@container pane (max-width: 600px) {
+  .tree-head, .row { grid-template-columns: minmax(150px, 1.1fr) minmax(0, 1.4fr) 80px; }
+  .tree-head .col-date, .row .c-date { display: none; }
+}
+@container pane (max-width: 420px) {
+  .tree-head, .row { grid-template-columns: minmax(0, 1fr) 76px; }
+  .tree-head .col-title, .row .c-title { display: none; }
+  .cmp.in-name { display: inline-block; }
+}
+/* short screens (laptops, zoomed pages): less chrome, more rows */
+@media (max-height: 800px) and (min-width: 641px) {
+  .toolbar { padding: 5px 12px; gap: 4px 8px; }
+  main { padding: 10px 12px; }
+  .workspace, .layout, .panes, .pane { gap: 8px; }
+  .cardbar { padding: 8px 12px; gap: 6px 16px; }
+  .card-name { font-size: 15px; }
+  .chips { margin-top: 4px; }
+  .layout.dual .chips { flex-wrap: nowrap; overflow: hidden; mask-image: linear-gradient(to right, #000 88%, transparent); }
+  .layout.dual .chips > * { flex: none; white-space: nowrap; }
+  .layout.dual .cardbar-main { flex: 1 1 100%; min-width: 0; }
+  .capacity-text { margin-bottom: 3px; }
+  .bar { height: 7px; }
+  .cmp-bar { padding: 5px 10px; gap: 4px 12px; }
+  .tree-filter { padding: 4px 6px; }
+  .tree-filter input { padding-top: 4px; padding-bottom: 4px; }
+  .tree-filter .filter-icon { left: 16px; }
+  .tree-head button { padding: 6px 8px; }
+  .sdbar { padding: 10px; gap: 8px; }
+}
+/* short and below 1600 px wide: the toolbar shows icons only (names stay in the tooltips) */
+@media (max-height: 800px) and (min-width: 641px) and (max-width: 1599px) {
+  .toolbar button span { display: none; }
+  .toolbar button { padding: 5px 7px; }
+}
+/* SD card list folded into a rail */
+.layout.has-sd.sd-collapsed { grid-template-columns: 48px minmax(0, 1fr) 300px; }
+.layout.has-sd.sd-collapsed.dual { grid-template-columns: 48px minmax(0, 1fr); }
+.sdbar.collapsed { padding: 6px; align-items: center; }
+.sd-rail { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 34px; padding: 8px 0; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.sd-rail:hover { border-color: var(--border); background: var(--surface-2); color: var(--text); }
+.sd-rail .sd-icon { width: 22px; height: 22px; color: var(--accent); }
+.sd-rail svg { width: 100%; height: 100%; }
+.sd-rail .twisty { width: 16px; height: 16px; }
+.sd-head .sd-fold { margin-left: auto; }
+.sd-head .sd-fold svg { transform: rotate(180deg); }
+.sd-head .sd-fold + .icon-btn { margin-left: 0; }
+@media (max-width: 900px) {
+  .layout.has-sd.sd-collapsed, .layout.has-sd.sd-collapsed.dual { grid-template-columns: 1fr; }
+  .layout.sd-collapsed .sdbar { height: auto; }
+  .sd-rail { flex-direction: row; width: auto; padding: 6px 10px; }
+}

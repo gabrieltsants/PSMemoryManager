@@ -17,7 +17,7 @@ Prefer a program on your computer? **[Download the local app](https://github.com
 ## What you can do
 
 - **See what is on a card:** every save with its game name, icon, size and region, and how much space is left. PS2 saves show their 3D icons, animated like on the console. Type in the search box to find a save by name, title or game code.
-- **Move saves around:** open two cards side by side and drag saves from one to the other.
+- **Move saves around:** open two cards side by side and drag saves from one to the other. **Compare** shows what is only on one of them and which copy is newer, and brings the other card up to date in one click.
 - **Back up and restore saves:** export saves to files and import them again, on the same card or another one.
 - **Clean up:** delete saves, folders and files. Every change can be undone until you save. On PS1 cards, a deleted save can even be restored later, like on the console.
 - **Resize existing cards:** make a PS2 card bigger or smaller (1 to 64 MB) without losing anything. Every save keeps its dates and attributes, and it works on cards on the SD card too.

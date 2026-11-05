@@ -48,6 +48,7 @@ const ICONS = {
   sun: `<circle ${S} cx="12" cy="12" r="4"/><path ${S} d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>`,
   moon: `<path ${S} d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>`,
   auto: `<circle ${S} cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>`,
+  compare: `<path ${S} d="M4 8h13l-3-3M20 16H7l3 3"/>`,
   search: `<circle ${S} cx="11" cy="11" r="6.5"/><path ${S} d="M16 16l5 5"/>`,
   list: `<path ${S} d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.3" fill="currentColor"/><circle cx="4.5" cy="12" r="1.3" fill="currentColor"/><circle cx="4.5" cy="18" r="1.3" fill="currentColor"/>`,
   archive: `<path ${S} d="M3 4h18v4H3z"/><path ${S} d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path ${S} d="M10 12h4"/>`,
@@ -411,6 +412,9 @@ function ok(r) {
 // State: two panes (card slots "A" and "B")
 
 const state = {
+  sdCollapsed: storage.get("psmm-sd-collapsed", "0") === "1", // SD card list folded into a thin rail (more room for the cards)
+  compare: false, // compare the two open cards (side-by-side view)
+  cmpDiffOnly: false, // while comparing: hide the saves that are the same on both
   ready: false,
   python: "",
   busy: false,
@@ -445,6 +449,12 @@ function makePane(slot) {
   $(".close-card", el).innerHTML = svg("close");
   $(".filter-icon", el).innerHTML = svg("search");
   pane.filter = "";
+  $(".cmp-bar", el).addEventListener("click", (ev) => {
+    if (ev.target.closest('[data-cmp="copy"]')) actCompareCopy(pane);
+  });
+  $(".cmp-bar", el).addEventListener("change", (ev) => {
+    if (ev.target.matches('[data-cmp="diff"]')) { state.cmpDiffOnly = ev.target.checked; render(); }
+  });
   const input = $(".filter", el);
   input.addEventListener("input", () => { pane.filter = input.value; renderTree(pane); });
   input.addEventListener("keydown", (ev) => {
@@ -550,9 +560,11 @@ function render() {
   $("#workspace").hidden = showEmpty;
   $("#layout").classList.toggle("dual", state.dual);
   $("#layout").classList.toggle("has-sd", !!sd);
+  $("#layout").classList.toggle("sd-collapsed", !!sd && state.sdCollapsed);
   $("#sdbar").hidden = !sd;
   renderSd();
   document.querySelector('.toolbar [data-act="dual"]').setAttribute("aria-pressed", String(state.dual));
+  document.querySelector('.toolbar [data-act="compare"]').setAttribute("aria-pressed", String(comparing()));
 
   const dirtyAny = SLOTS.some((s) => panes[s].summary?.dirty);
   document.title = a.summary ? `${dirtyAny ? "● " : ""}${a.summary.card.name} — PSMemoryManager` : "PSMemoryManager";
@@ -572,6 +584,7 @@ function renderPane(p) {
   $(".tree-wrap", p.el).hidden = !has;
   $(".pane-empty", p.el).hidden = has;
   if (!has) {
+    $(".cmp-bar", p.el).hidden = true;
     // empty pane: in single view with an SD card open, point to the SD list
     const fromSd = !!sd && !state.dual;
     $(".pane-empty h2", p.el).textContent = t(fromSd ? "pane.sdTitle" : "pane.emptyTitle");
@@ -629,6 +642,7 @@ function renderPane(p) {
     b.classList.toggle("sorted", b.dataset.sort === state.sort.key);
     b.classList.toggle("desc", b.dataset.sort === state.sort.key && state.sort.desc);
   });
+  renderCompareBar(p);
   renderTree(p);
 }
 
@@ -654,7 +668,7 @@ function renderBlockMap(p) {
   $(".blockmap", p.el).innerHTML = cells.join("");
 }
 
-function renderPs1Row(p, e) {
+function renderPs1Row(p, e, cmpSt = null) {
   const cls = ["row", "ps1row"];
   if (p.selected.has(e.path)) cls.push("selected");
   if (p.focus === e.path) cls.push("focused");
@@ -663,13 +677,95 @@ function renderPs1Row(p, e) {
     (e.deleted ? `<span class="tag del" title="${esc(t(e.restorable ? "tree.deletedTip" : "tree.goneTip"))}">${esc(t("tree.deleted"))}</span>` : "") +
     (e.pocketstation ? `<span class="tag">PocketStation</span>` : "") +
     (e.exploit ? `<span class="tag">${esc(t("tree.exploit"))}</span>` : "") +
-    (e.problems.length && !e.deleted ? `<span class="lock" title="${esc(t("tree.problems"))}">${svg("warn")}</span>` : "");
+    (e.problems.length && !e.deleted ? `<span class="lock" title="${esc(t("tree.problems"))}">${svg("warn")}</span>` : "") +
+    cmpBadge(cmpSt, "in-name");
   return `<div class="${cls.join(" ")}" role="treeitem" draggable="${!e.deleted}" aria-level="1" aria-selected="${p.selected.has(e.path)}" data-path="${esc(e.path)}">` +
     `<div class="c-name" style="padding-left:8px"><span class="ricon ps1">${ps1IconHtml(e)}</span>` +
     `<span class="nm" title="${esc(e.name)}">${esc(e.name)}</span>${tags}</div>` +
-    `<div class="c-title" title="${esc(e.title)}">${esc(e.title)}</div>` +
+    `<div class="c-title" title="${esc(e.title)}">${cmpBadge(cmpSt)}${esc(e.title)}</div>` +
     `<div class="c-size">${esc(blocksLabel(e.blocks.length))}</div>` +
     `<div class="c-date">${esc(blockRanges(e.blocks))}</div></div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Compare the two open cards: what each save at the root looks like on the other
+// card. PS2 saves are matched by folder name and told apart by date and size;
+// PS1 saves have no dates, so they are only "here only" or "on both".
+
+const canCompare = () => state.dual && !!panes.A.summary && !!panes.B.summary &&
+  panes.A.summary.card.platform === panes.B.summary.card.platform;
+const comparing = () => state.compare && canCompare();
+
+function compareStatus(p) {
+  if (!comparing()) return null;
+  const other = panes[otherSlot(p.slot)];
+  const live = (list) => list.filter((e) => !e.deleted);
+  const theirs = new Map(live(other.summary.tree).map((e) => [e.name, e]));
+  const out = new Map();
+  for (const e of live(p.summary.tree)) {
+    const o = theirs.get(e.name);
+    let st;
+    if (!o) st = "only";
+    else if (isPs1(p)) st = "both";
+    else {
+      const a = e.modified ? Date.parse(e.modified) : 0, b = o.modified ? Date.parse(o.modified) : 0;
+      if (a > b) st = "newer";
+      else if (a < b) st = "older";
+      else st = e.size === o.size && e.files === o.files ? "same" : "diff";
+    }
+    out.set(e.path, st);
+  }
+  return out;
+}
+
+// only differences get a badge: the saves that match are counted in the bar
+// in-name copy: shown instead when the pane is too narrow for the title column
+const cmpBadge = (st, where = "") => (st && st !== "same" && st !== "both"
+  ? `<span class="cmp cmp-${st}${where ? " " + where : ""}" title="${esc(t(`cmp.${st}Tip`))}">${esc(t(`cmp.${st}`))}</span>` : "");
+
+function renderCompareBar(p) {
+  const bar = $(".cmp-bar", p.el);
+  const cmp = compareStatus(p);
+  bar.hidden = !cmp;
+  if (!cmp) { bar.innerHTML = ""; return; }
+  const other = otherSlot(p.slot);
+  const n = { only: 0, newer: 0, older: 0, diff: 0, same: 0, both: 0 };
+  for (const st of cmp.values()) n[st]++;
+  const parts = ["only", "newer", "older", "diff", "same", "both"].filter((k) => n[k]).map((k) => t(`cmp.count.${k}${n[k] === 1 ? "1" : ""}`, { n: n[k] }));
+  const toCopy = n.only + n.newer;
+  const ro = panes[other].summary.card.readOnly;
+  bar.innerHTML =
+    `<span class="cmp-sum">${esc(t("cmp.with", { slot: other }))} ${esc(parts.join(" · ") || t("cmp.empty"))}</span>` +
+    `<label class="inline"><input type="checkbox" data-cmp="diff"${state.cmpDiffOnly ? " checked" : ""}> ${esc(t("cmp.diffOnly"))}</label>` +
+    (toCopy ? `<button class="btn small" data-cmp="copy" ${ro ? "disabled" : ""} title="${esc(t("cmp.copyTip", { slot: other }))}">` +
+      `${svg("copy")}${esc(t("cmp.copy", { n: toCopy, slot: other }))}</button>` : "");
+}
+
+async function actCompareCopy(p) {
+  const cmp = compareStatus(p);
+  if (!cmp) return;
+  const other = otherSlot(p.slot);
+  const only = [...cmp].filter(([, st]) => st === "only").map(([path]) => path);
+  const newer = [...cmp].filter(([, st]) => st === "newer").map(([path]) => path);
+  if (!only.length && !newer.length) return;
+  const yes = await openDialog(
+    `<h3>${esc(t("cmp.copyTitle", { slot: other }))}</h3>` +
+    `<div class="msg">${esc(t("cmp.copyMsg", { slot: other, what: [
+      only.length ? t(only.length === 1 ? "cmp.copyOnly1" : "cmp.copyOnly", { n: only.length, slot: other }) : "",
+      newer.length ? t(newer.length === 1 ? "cmp.copyNewer1" : "cmp.copyNewer", { n: newer.length }) : "",
+    ].filter(Boolean).join(t("cmp.and")) }))}</div>` +
+    (newer.length ? `<div class="warnbox">${esc(t("cmp.copyReplace", { n: newer.length, slot: other }))}</div>` : "") +
+    actionsHtml(t("cmp.copyGo")),
+    () => true,
+  );
+  if (!yes || state.busy) return;
+  const paths = [...only, ...newer];
+  await run("st.copying", { slot: other }, async () => {
+    const r = ok(await rpc("copy", [p.slot, paths, other, "/", newer.length > 0]));
+    applySummary(panes[other], r);
+    toast(t("toast.copied", { n: paths.length, slot: other }), "ok");
+    status("st.copied", { slot: other });
+  });
 }
 
 function renderTree(p) {
@@ -678,11 +774,14 @@ function renderTree(p) {
   const words = filterWords(p);
   if (words.length && !gameDb) loadGameDb();
   const empty = (key) => `<div class="tree-empty">${esc(words.length ? t("filter.none", { q: p.filter.trim() }) : t(key))}</div>`;
+  const cmp = compareStatus(p);
+  const hideSame = (e) => cmp && state.cmpDiffOnly && ["same", "both"].includes(cmp.get(e.path));
   if (isPs1(p)) {
     for (const e of sortedChildren(p.summary.tree)) {
       if (words.length && !entryMatches(e, words)) continue;
+      if (hideSame(e) || (cmp && state.cmpDiffOnly && e.deleted)) continue;
       p.visible.push(e);
-      rows.push(renderPs1Row(p, e));
+      rows.push(renderPs1Row(p, e, cmp?.get(e.path)));
     }
     p.tree.innerHTML = rows.length ? rows.join("") : empty("tree.emptyPs1");
     renderBlockMap(p);
@@ -695,6 +794,7 @@ function renderTree(p) {
     for (const e of sortedChildren(list)) {
       const self = !filtering || entryMatches(e, words);
       if (!self && !keep(e)) continue;
+      if (depth === 0 && hideSame(e)) continue;
       p.visible.push(e);
       const open = p.expanded.has(e.path) || !self;
       const hasKids = e.dir && e.children && e.children.length > 0;
@@ -709,8 +809,9 @@ function renderTree(p) {
         ps2RowIcon(p, e) +
         `<span class="nm" title="${esc(e.name)}">${esc(e.name)}</span>` +
         `${e.protected ? `<span class="lock" title="${esc(t("tree.protected"))}">${svg("lock")}</span>` : ""}` +
+        (depth === 0 ? cmpBadge(cmp?.get(e.path), "in-name") : "") +
         `</div>` +
-        `<div class="c-title" title="${esc(e.title)}">${esc(e.title)}</div>` +
+        `<div class="c-title" title="${esc(e.title)}">${depth === 0 ? cmpBadge(cmp?.get(e.path)) : ""}${esc(e.title)}</div>` +
         `<div class="c-size">${human(e.size)}</div>` +
         `<div class="c-date">${fmtDate(e.modified)}</div>` +
         `</div>`
@@ -719,7 +820,7 @@ function renderTree(p) {
     }
   };
   walk(p.summary.tree, 0, words.length > 0);
-  p.tree.innerHTML = rows.length ? rows.join("") : empty("tree.empty");
+  p.tree.innerHTML = rows.length ? rows.join("") : cmp && state.cmpDiffOnly && !words.length ? `<div class="tree-empty">${esc(t("cmp.noDiff"))}</div>` : empty("tree.empty");
   queuePs2Icons(p);
 }
 
@@ -843,7 +944,7 @@ function updateActions() {
     extract: has && !ps1, rename: has && !ps1 && sel === 1,
     delete: has && sel > 0 && !ro && (!ps1 || selectedSaves(p).length > 0), check: has,
     importSave: state.ready && !ro, exportSave: has && selectedSaves(p).length > 0,
-    dual: state.ready, copy: canCopy(p), sd: state.ready, convert: has, split: has && !ro, resize: has && !ps1,
+    dual: state.ready, compare: canCompare(), copy: canCopy(p), sd: state.ready, convert: has, split: has && !ro, resize: has && !ps1,
     restore: has && selectedRestorable(p).length > 0,
   };
   document.querySelectorAll("[data-act]").forEach((b) => {
@@ -1357,6 +1458,11 @@ function actDual() {
   render();
 }
 
+function actCompare() {
+  state.compare = !state.compare;
+  render();
+}
+
 function actCopy(p = P()) {
   if (!canCopy(p)) return;
   copyItems(p.slot, [...p.selected], otherSlot(p.slot), "/");
@@ -1370,7 +1476,7 @@ const ACTIONS = {
   importSave: () => { pickTarget = state.active; $("#pickSaves").value = ""; $("#pickSaves").click(); },
   exportSave: () => actExportSave(),
   mkdir: () => actMkdir(), extract: () => actExtract(), rename: () => actRename(), delete: () => actDelete(),
-  check: () => actCheck(), dual: actDual, copy: () => actCopy(), sd: () => actOpenSd(), restore: () => actRestore(),
+  check: () => actCheck(), dual: actDual, compare: actCompare, copy: () => actCopy(), sd: () => actOpenSd(), restore: () => actRestore(),
   convert: () => actConvert(), split: () => actSplit(), resize: () => actResize(),
 };
 
@@ -2055,10 +2161,17 @@ const sdFolder = (variant, folder) => sdVariant(variant)?.folders.find((f) => f.
 function renderSd() {
   const bar = $("#sdbar");
   if (!sd) { bar.innerHTML = ""; return; }
+  bar.classList.toggle("collapsed", state.sdCollapsed);
+  if (state.sdCollapsed) {
+    bar.innerHTML = `<button class="sd-rail" data-sd="collapse" title="${esc(t("sd.expand", { name: sd.name }))}" aria-label="${esc(t("sd.expand", { name: sd.name }))}">` +
+      `<span class="sd-icon">${svg("sd")}</span><span class="twisty">${svg("chevron")}</span></button>`;
+    return;
+  }
   const ro = sd.readOnly;
   const dis = ro || state.busy ? "disabled" : "";
   let html =
     `<div class="sd-head"><span class="sd-icon">${svg("sd")}</span><span class="sd-name" title="${esc(sd.name)}">${esc(sd.name)}</span>` +
+    `<button class="icon-btn small sd-fold" data-sd="collapse" title="${esc(t("sd.collapse"))}" aria-label="${esc(t("sd.collapse"))}">${svg("chevron")}</button>` +
     `<button class="icon-btn small" data-sd="close" title="${esc(t("sd.close"))}" aria-label="${esc(t("sd.close"))}">${svg("close")}</button></div>` +
     `<div class="sd-tools">` +
     `<button data-sd="settings" ${dis}><i data-icon="gear"></i>${esc(t("sd.settings"))}</button>` +
@@ -2116,6 +2229,12 @@ $("#sdbar").addEventListener("click", (ev) => {
   if (!el || el.disabled || !sd) return;
   ev.stopPropagation();
   const act = el.dataset.sd;
+  if (act === "collapse") {
+    state.sdCollapsed = !state.sdCollapsed;
+    storage.set("psmm-sd-collapsed", state.sdCollapsed ? "1" : "0");
+    render();
+    return;
+  }
   if (act === "toggle") {
     const key = el.dataset.key;
     sd.expanded.has(key) ? sd.expanded.delete(key) : sd.expanded.add(key);

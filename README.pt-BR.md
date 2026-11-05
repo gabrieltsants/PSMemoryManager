@@ -17,7 +17,7 @@ Prefere um programa no computador? **[Baixe o aplicativo local](https://github.c
 ## O que dá para fazer
 
 - **Ver o que tem no cartão:** cada save com o nome do jogo, ícone, tamanho e região, e quanto espaço sobra. Os saves de PS2 mostram os ícones 3D, animados como no console. Digite na caixa de busca para achar um save pelo nome, título ou código do jogo.
-- **Transferir saves:** abra dois cartões lado a lado e arraste os saves de um para o outro.
+- **Transferir saves:** abra dois cartões lado a lado e arraste os saves de um para o outro. **Comparar** mostra o que está só em um deles e qual cópia é mais nova, e atualiza o outro cartão com um clique.
 - **Fazer backup e restaurar saves:** exporte saves para arquivos e importe-os de novo, no mesmo cartão ou em outro.
 - **Fazer uma limpeza:** apague saves, pastas e arquivos. Toda alteração pode ser desfeita até você salvar. Nos cartões de PS1, um save apagado pode até ser restaurado depois, como no console.
 - **Redimensionar cartões existentes:** aumente ou diminua um cartão de PS2 (de 1 a 64 MB) sem perder nada. Cada save mantém as datas e os atributos, e funciona também nos cartões do cartão SD.
