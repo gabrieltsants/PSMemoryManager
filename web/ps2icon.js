@@ -130,7 +130,7 @@ function shapeWeights(icon, t) {
       if (next === null || b < nextT) { next = kv; nextT = b; }
     }
     if (last === null) continue;
-    const p = nextT > lastT ? (t - lastT) / (nextT - lastT) : 0;
+    const p = nextT > lastT ? Math.min(1, Math.max(0, (t - lastT) / (nextT - lastT))) : 0;
     w.set(fr.shape, (1 - p) * last + p * next);
   }
   let sum = 0;
@@ -290,7 +290,9 @@ export class IconRenderer {
       this.uploaded = true;
     } else {
       out.fill(0);
-      for (const [shape, w] of shapeWeights(icon, t % icon.frameLength)) {
+      // t can be negative (a clock that starts over, e.g. a test's fake clock): wrap it into [0, length)
+      const L = icon.frameLength;
+      for (const [shape, w] of shapeWeights(icon, ((t % L) + L) % L)) {
         if (shape >= icon.shapes || !w) continue;
         const base = shape * n;
         for (let i = 0; i < n; i++) out[i] += w * icon.pos[base + i];

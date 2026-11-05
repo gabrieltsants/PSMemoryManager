@@ -175,6 +175,19 @@ def dual_gif(browser, url, sd):
     pg.context.close()
 
 
+# mean difference between the 3D icon now and the first frame (stored when compare is false)
+VIEW_DIFF = """(compare) => {
+  const c = document.querySelector('#details canvas.ps2-view');
+  const a = document.createElement('canvas'); a.width = a.height = 64;
+  const x = a.getContext('2d'); x.drawImage(c, 0, 0, 64, 64);
+  const cur = x.getImageData(0, 0, 64, 64).data;
+  if (!compare) { window.__firstView = cur; return 0; }
+  let d = 0;
+  for (let i = 0; i < cur.length; i += 4) d += Math.abs(cur[i] - window.__firstView[i]);
+  return d / (64 * 64);
+}"""
+
+
 def make_gif(frames: Path, gif: Path, fps: int, width: int) -> None:
     palette = frames / "palette.png"
     scale = f"fps={fps},scale={width}:-1:flags=lanczos"
@@ -199,14 +212,20 @@ def ps2_icons_gif(browser, url, card, save_title):
     pg.get_by_text(save_title, exact=False).first.click()
     pg.wait_for_selector("#details canvas.ps2-view")
     quiet(pg)
-    # drive time by hand: every frame is exactly 1/fps apart, and the GIF ends where it began
+    # drive time by hand so every frame is exactly 1/fps apart. Under the fake clock the turn
+    # speed is not the real one, so the loop length is measured: stop at the frame that looks
+    # most like the first one (a full turn), for a GIF without a jump
     pg.clock.install()
-    fps, turn = 10, 2 * 3.141592653589793 / 0.6  # the view turns 0.6 rad/s
+    fps = 10
     frames = Path(tempfile.mkdtemp())
-    n = round(turn * fps)
-    for i in range(n):
+    diffs = []
+    for i in range(200):
         pg.clock.run_for(1000 // fps)
         pg.screenshot(path=frames / f"{i:03d}.png")
+        diffs.append(pg.evaluate(VIEW_DIFF, i > 0))
+    end = min(range(40, len(diffs)), key=diffs.__getitem__)
+    for i in range(end, len(diffs)):
+        (frames / f"{i:03d}.png").unlink()
     make_gif(frames, OUT / "ps2-icons.gif", fps, 900)
     shutil.rmtree(frames)
     ctx.close()
