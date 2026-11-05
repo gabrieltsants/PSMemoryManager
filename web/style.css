@@ -538,8 +538,10 @@ dialog.wide { width: min(980px, calc(100vw - 32px)); max-width: none; }
   .tree-head button { padding: 6px 8px; }
   .sdbar { padding: 10px; gap: 8px; }
 }
-/* short and below 1600 px wide: the toolbar shows icons only (names stay in the tooltips) */
-@media (max-height: 800px) and (min-width: 641px) and (max-width: 1599px) {
+/* short and narrower than 1400 px (laptops): the toolbar shows icons only (names stay in
+   the tooltips). A 1600 or 1440 px monitor keeps the names: its page area is a bit narrower
+   than the screen (scroll bar, window borders), so the cut is well below those widths */
+@media (max-height: 800px) and (min-width: 641px) and (max-width: 1399px) {
   .toolbar button span { display: none; }
   .toolbar button { padding: 5px 7px; }
 }
