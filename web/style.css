@@ -464,3 +464,32 @@ dialog .err { color: var(--danger); font-size: 12.5px; min-height: 1em; }
 .ps2-slot:not(.ready) { opacity: .5; }
 .ps2-view { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
 .ps2-view:active { cursor: grabbing; }
+
+/* search in the card list */
+.tree-filter { position: relative; display: flex; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.tree-filter .filter-icon { position: absolute; left: 18px; width: 16px; height: 16px; color: var(--muted); pointer-events: none; }
+.tree-filter .filter-icon svg { width: 100%; height: 100%; }
+.tree-filter input { flex: 1; min-width: 0; padding: 6px 10px 6px 32px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 13px; }
+.tree-filter input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* "All saves" (SD card) */
+dialog.wide { width: min(980px, calc(100vw - 32px)); max-width: none; }
+.as-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 8px 0 4px; }
+.as-tools .tree-filter { flex: 1; min-width: 220px; padding: 0; border: 0; }
+.as-tools .tree-filter .filter-icon { left: 10px; }
+.as-count { font-size: 12px; margin: 4px 0; }
+.as-list { max-height: min(60vh, 560px); overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+.as-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) 80px 110px; gap: 10px; align-items: center; width: 100%; padding: 7px 10px; border: 0; border-bottom: 1px solid var(--border); background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.as-row:last-child { border-bottom: 0; }
+.as-row:hover, .as-row:focus-visible { background: var(--surface-2); }
+.as-title { display: flex; flex-direction: column; min-width: 0; }
+.as-title b, .as-title small, .as-where { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.as-title b { font-weight: 600; }
+.as-title small, .as-where { color: var(--muted); font-size: 12px; }
+.as-size { text-align: right; font-variant-numeric: tabular-nums; }
+.as-row .tag { justify-self: start; }
+@media (max-width: 640px) {
+  .as-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .as-where { grid-column: 1 / -1; grid-row: 2; }
+  .as-size { display: none; }
+}

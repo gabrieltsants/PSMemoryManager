@@ -16,13 +16,13 @@ Prefer a program on your computer? **[Download the local app](https://github.com
 
 ## What you can do
 
-- **See what is on a card:** every save with its game name, icon, size and region, and how much space is left. PS2 saves show their 3D icons, animated like on the console.
+- **See what is on a card:** every save with its game name, icon, size and region, and how much space is left. PS2 saves show their 3D icons, animated like on the console. Type in the search box to find a save by name, title or game code.
 - **Move saves around:** open two cards side by side and drag saves from one to the other.
 - **Back up and restore saves:** export saves to files and import them again, on the same card or another one.
 - **Clean up:** delete saves, folders and files. Every change can be undone until you save. On PS1 cards, a deleted save can even be restored later, like on the console.
 - **Resize existing cards:** make a PS2 card bigger or smaller (1 to 64 MB) without losing anything. Every save keeps its dates and attributes, and it works on cards on the SD card too.
 - **Convert cards** between devices and emulators, merge cards, or split a card into one card per game.
-- **Manage a PSxMemCard Gen2 / SD2PSX SD card:** see every card and channel, open and save them straight on the SD card, create new ones, name channels and change the device settings.
+- **Manage a PSxMemCard Gen2 / SD2PSX SD card:** see every card and channel, open and save them straight on the SD card, create new ones, name channels and change the device settings. **All saves** lists the saves of every card in one place (and shows the ones that are on more than one card), and **Backup** saves the whole SD card in one .zip file.
 - **Check a card** for errors.
 
 ![A PS2 card with the saves' 3D icons in the list and the Silent Hill 2 icon turning in the details panel](docs/img/ps2-icons.gif)
@@ -85,7 +85,7 @@ It only runs on your computer: no other device on the network can reach it. A Wi
 - **FreePSXBoot** cards open read-only, so they keep working.
 - `.vmp` (PSP/Vita) and `.psv` (PS3) files are signed when you save or export them, so the consoles accept them.
 
-Shortcuts: `Ctrl+O` open · `Ctrl+S` save · `Ctrl+Z` undo · `Ctrl+E` extract · `Ctrl+Shift+N` new folder · `F2` rename · `Del` delete · `Esc` clear selection.
+Shortcuts: `/` search · `Ctrl+O` open · `Ctrl+S` save · `Ctrl+Z` undo · `Ctrl+E` extract · `Ctrl+Shift+N` new folder · `F2` rename · `Del` delete · `Esc` clear selection.
 
 ## More
 

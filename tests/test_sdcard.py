@@ -127,3 +127,24 @@ def test_real_sd_sample_read_only():
     lay = sd.parse_listing(files, texts)
     boot = lay.variant("PS2").find("BOOT")
     assert len(boot.channels) == 6 and boot.channels[0].name
+
+
+def test_web_api_sd_index_card(tmp_path, monkeypatch):
+    import json
+    from psmm import web_api
+    from psmm.core.card import MemoryCard
+
+    monkeypatch.setattr(web_api, "INDEX", tmp_path / "index.bin")
+    c = MemoryCard.create(web_api.INDEX, 8, ecc=False)
+    with c.edit() as ed:
+        ed.mkdir("/BASLUS-20963GTA")
+        ed.write_file("/BASLUS-20963GTA/data", b"x" * 3000)
+        ed.write_file("/loose.bin", b"y")
+    c.close()
+    r = json.loads(web_api.sd_index_card())
+    assert r["ok"] and r["platform"] == "PS2"
+    assert [(s["name"], s["serial"]) for s in r["saves"]] == [("BASLUS-20963GTA", "SLUS-20963")]
+    assert not web_api.INDEX.exists()  # removed after reading
+    web_api.INDEX.write_bytes(b"not a card" * 100)
+    r = json.loads(web_api.sd_index_card())
+    assert not r["ok"] and not web_api.INDEX.exists()

@@ -16,13 +16,13 @@ Prefere um programa no computador? **[Baixe o aplicativo local](https://github.c
 
 ## O que dá para fazer
 
-- **Ver o que tem no cartão:** cada save com o nome do jogo, ícone, tamanho e região, e quanto espaço sobra. Os saves de PS2 mostram os ícones 3D, animados como no console.
+- **Ver o que tem no cartão:** cada save com o nome do jogo, ícone, tamanho e região, e quanto espaço sobra. Os saves de PS2 mostram os ícones 3D, animados como no console. Digite na caixa de busca para achar um save pelo nome, título ou código do jogo.
 - **Transferir saves:** abra dois cartões lado a lado e arraste os saves de um para o outro.
 - **Fazer backup e restaurar saves:** exporte saves para arquivos e importe-os de novo, no mesmo cartão ou em outro.
 - **Fazer uma limpeza:** apague saves, pastas e arquivos. Toda alteração pode ser desfeita até você salvar. Nos cartões de PS1, um save apagado pode até ser restaurado depois, como no console.
 - **Redimensionar cartões existentes:** aumente ou diminua um cartão de PS2 (de 1 a 64 MB) sem perder nada. Cada save mantém as datas e os atributos, e funciona também nos cartões do cartão SD.
 - **Converter cartões** entre aparelhos e emuladores, juntar cartões ou separar um cartão em um cartão por jogo.
-- **Gerenciar o cartão SD do PSxMemCard Gen2 / SD2PSX:** veja todos os cartões e canais, abra e salve direto no SD, crie novos, dê nome aos canais e altere as configurações do aparelho.
+- **Gerenciar o cartão SD do PSxMemCard Gen2 / SD2PSX:** veja todos os cartões e canais, abra e salve direto no SD, crie novos, dê nome aos canais e altere as configurações do aparelho. **Todos os saves** lista os saves de todos os cartões num lugar só (e mostra os que estão em mais de um cartão), e **Backup** guarda o cartão SD inteiro em um arquivo .zip.
 - **Verificar um cartão** em busca de erros.
 
 ![Um cartão de PS2 com os ícones 3D dos saves na lista e o ícone do Silent Hill 2 girando no painel de detalhes](docs/img/ps2-icons.gif)
@@ -85,7 +85,7 @@ Ele roda só no seu computador: nenhum outro aparelho da rede consegue acessá-l
 - Cartões do **FreePSXBoot** abrem só para leitura, para continuarem funcionando.
 - Arquivos `.vmp` (PSP/Vita) e `.psv` (PS3) são assinados ao salvar ou exportar, para os consoles aceitarem.
 
-Atalhos: `Ctrl+O` abrir · `Ctrl+S` salvar · `Ctrl+Z` desfazer · `Ctrl+E` extrair · `Ctrl+Shift+N` nova pasta · `F2` renomear · `Del` apagar · `Esc` limpar seleção.
+Atalhos: `/` buscar · `Ctrl+O` abrir · `Ctrl+S` salvar · `Ctrl+Z` desfazer · `Ctrl+E` extrair · `Ctrl+Shift+N` nova pasta · `F2` renomear · `Del` apagar · `Esc` limpar seleção.
 
 ## Mais
 

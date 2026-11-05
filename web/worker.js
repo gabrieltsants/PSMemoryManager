@@ -111,6 +111,11 @@ const handlers = {
 
   // Gen2 SD card: the page does the file access, Python the layout/INI logic
   sdLoad: async (files, texts) => call("sd_load", JSON.stringify(files), JSON.stringify(texts)),
+  // one card of the SD, for the "All saves" view (the file is removed after reading)
+  sdIndexCard: async (buffer) => {
+    py.FS.writeFile("/psmm/index.bin", new Uint8Array(buffer));
+    return call("sd_index_card");
+  },
   sdWriteSettings: async (values) => call("sd_write_settings", JSON.stringify(values)),
   sdWriteChannelNames: async (iniPath, names) => call("sd_write_channel_names", iniPath, JSON.stringify(names)),
   sdRemoveChannelName: async (iniPath, channel) => call("sd_remove_channel_name", iniPath, channel),

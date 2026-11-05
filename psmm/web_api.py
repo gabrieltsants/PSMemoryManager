@@ -44,6 +44,7 @@ WORK = Path("/psmm")
 STAGING = WORK / "staging"  # JS writes files to add / saves to import here
 INCOMING = WORK / "incoming.bin"  # JS writes the card to open here
 EXPORT = WORK / "export.bin"  # and reads downloads from here
+INDEX = WORK / "index.bin"  # JS writes one SD card here to list its saves ("All saves")
 HISTORY_LIMIT_BYTES = 192 * 1024 * 1024  # per slot
 SLOTS = ("A", "B")
 
@@ -659,6 +660,38 @@ def sd_load(files_json: str, texts_json: str) -> str:
         out["settingsPath"] = _sdcard.SETTINGS_FILE
         out["game2folderPath"] = _sdcard.GAME2FOLDER_FILE
         return out
+
+    return _result(run)
+
+
+def sd_index_card() -> str:
+    """The saves on the card JS wrote to ``INDEX`` (one card of the SD at a time).
+
+    Used by the "All saves" view: only the root folders (PS2) or the live saves
+    (PS1), without icons or file contents. The file is removed afterwards.
+    """
+
+    def run():
+        try:
+            with _open_any(INDEX) as c:
+                if _is_ps1(c):
+                    saves = [
+                        {"name": e.name, "title": e.title, "serial": e.serial, "size": e.size, "modified": None}
+                        for e in c.directory().live()
+                    ]
+                    return {"platform": "PS1", "saves": saves}
+                saves = []
+                for e in c.list_dir("/"):
+                    if not e.is_dir:
+                        continue
+                    gid = e.game_id
+                    saves.append({
+                        "name": e.name, "title": e.title, "serial": gid.serial if gid else None, "size": e.size,
+                        "modified": e.modified.isoformat() if e.modified else None,
+                    })
+                return {"platform": "PS2", "saves": saves}
+        finally:
+            INDEX.unlink(missing_ok=True)
 
     return _result(run)
 

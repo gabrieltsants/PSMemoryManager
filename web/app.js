@@ -48,6 +48,9 @@ const ICONS = {
   sun: `<circle ${S} cx="12" cy="12" r="4"/><path ${S} d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>`,
   moon: `<path ${S} d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>`,
   auto: `<circle ${S} cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>`,
+  search: `<circle ${S} cx="11" cy="11" r="6.5"/><path ${S} d="M16 16l5 5"/>`,
+  list: `<path ${S} d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.3" fill="currentColor"/><circle cx="4.5" cy="12" r="1.3" fill="currentColor"/><circle cx="4.5" cy="18" r="1.3" fill="currentColor"/>`,
+  archive: `<path ${S} d="M3 4h18v4H3z"/><path ${S} d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path ${S} d="M10 12h4"/>`,
   warn: `<path ${S} d="M12 3.5 2.5 20h19z"/><path ${S} d="M12 10v4.5"/><circle cx="12" cy="17.2" r="1.1" fill="currentColor"/>`,
 };
 const svg = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>`;
@@ -440,11 +443,30 @@ function makePane(slot) {
     sdPath: null, // path on the open SD card, if the card came from there
   };
   $(".close-card", el).innerHTML = svg("close");
+  $(".filter-icon", el).innerHTML = svg("search");
+  pane.filter = "";
+  const input = $(".filter", el);
+  input.addEventListener("input", () => { pane.filter = input.value; renderTree(pane); });
+  input.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape" && input.value) { ev.stopPropagation(); input.value = ""; pane.filter = ""; renderTree(pane); }
+    else if (ev.key === "ArrowDown" || ev.key === "Enter") { ev.preventDefault(); pane.tree.focus(); if (pane.visible[0] && !pane.focus) select(pane, pane.visible[0].path); }
+  });
   bindTree(pane);
   return pane;
 }
 
+// Search: every word must appear in the name, title, game code or game name (no accents, any case)
+const fold = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const filterWords = (p) => fold(p.filter).split(/\s+/).filter(Boolean);
+function entryMatches(e, words) {
+  const serial = e.serial || "";
+  const hay = fold(`${e.name} ${e.title || ""} ${serial} ${serial.replace("-", "")} ${gameName(serial) || ""}`);
+  return words.every((w) => hay.includes(w));
+}
+
 function resetPane(p) {
+  p.filter = "";
+  $(".filter", p.el).value = "";
   p.summary = null;
   p.fileHandle = null;
   p.sdPath = null;
@@ -653,16 +675,28 @@ function renderPs1Row(p, e) {
 function renderTree(p) {
   const rows = [];
   p.visible = [];
+  const words = filterWords(p);
+  if (words.length && !gameDb) loadGameDb();
+  const empty = (key) => `<div class="tree-empty">${esc(words.length ? t("filter.none", { q: p.filter.trim() }) : t(key))}</div>`;
   if (isPs1(p)) {
-    for (const e of sortedChildren(p.summary.tree)) { p.visible.push(e); rows.push(renderPs1Row(p, e)); }
-    p.tree.innerHTML = rows.length ? rows.join("") : `<div class="tree-empty">${esc(t("tree.emptyPs1"))}</div>`;
+    for (const e of sortedChildren(p.summary.tree)) {
+      if (words.length && !entryMatches(e, words)) continue;
+      p.visible.push(e);
+      rows.push(renderPs1Row(p, e));
+    }
+    p.tree.innerHTML = rows.length ? rows.join("") : empty("tree.emptyPs1");
     renderBlockMap(p);
     return;
   }
-  const walk = (list, depth) => {
+  // with a search: a folder that matches shows all it has; one that only holds
+  // matches is opened to show them
+  const keep = (e) => entryMatches(e, words) || (e.children || []).some(keep);
+  const walk = (list, depth, filtering) => {
     for (const e of sortedChildren(list)) {
+      const self = !filtering || entryMatches(e, words);
+      if (!self && !keep(e)) continue;
       p.visible.push(e);
-      const open = p.expanded.has(e.path);
+      const open = p.expanded.has(e.path) || !self;
       const hasKids = e.dir && e.children && e.children.length > 0;
       const cls = ["row"];
       if (p.selected.has(e.path)) cls.push("selected");
@@ -681,11 +715,11 @@ function renderTree(p) {
         `<div class="c-date">${fmtDate(e.modified)}</div>` +
         `</div>`
       );
-      if (e.dir && open && e.children) walk(e.children, depth + 1);
+      if (e.dir && open && e.children) walk(e.children, depth + 1, !self);
     }
   };
-  walk(p.summary.tree, 0);
-  p.tree.innerHTML = rows.length ? rows.join("") : `<div class="tree-empty">${esc(t("tree.empty"))}</div>`;
+  walk(p.summary.tree, 0, words.length > 0);
+  p.tree.innerHTML = rows.length ? rows.join("") : empty("tree.empty");
   queuePs2Icons(p);
 }
 
@@ -1480,6 +1514,7 @@ document.addEventListener("keydown", (ev) => {
   else if (mod && k === "z") fire("undo");
   else if (mod && k === "e") fire("extract");
   else if (mod && ev.shiftKey && k === "n") fire("mkdir");
+  else if (ev.key === "/" && !mod && P().summary) { ev.preventDefault(); $(".filter", P().el).focus(); }
   else if (ev.key === "F2") fire("rename");
   else if (ev.key === "Delete") fire("delete");
   else if (ev.key === "Escape") {
@@ -1756,6 +1791,263 @@ async function sdDeleteFile(path) {
   await dir.removeEntry(parts[parts.length - 1]);
 }
 
+// ---------------------------------------------------------------------------
+// Whole-SD backup: a .zip of MemoryCards/ and .sd2psx/, made in the browser.
+// Files are compressed one at a time (cards are mostly empty and shrink a lot)
+// and written straight to disk when the browser allows it, so even a large SD
+// card needs little memory. ZIP64 kicks in past 4 GB.
+
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(u8) {
+  let c = 0xffffffff;
+  for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+async function deflateRaw(u8) {
+  const stream = new Blob([u8]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+// minimal streaming ZIP writer; out(chunk) receives each piece in order
+function zipWriter(out) {
+  const enc = new TextEncoder();
+  const central = [];
+  let offset = 0;
+  const put = async (u8) => { await out(u8); offset += u8.length; };
+  const dosTime = (ms) => {
+    const d = new Date(ms || Date.now());
+    const y = Math.max(1980, d.getFullYear());
+    return {
+      time: (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1),
+      date: ((y - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate(),
+    };
+  };
+  return {
+    async add(name, data, mtime) {
+      const raw = data;
+      const crc = crc32(raw);
+      let body = await deflateRaw(raw);
+      let method = 8;
+      if (body.length >= raw.length) { body = raw; method = 0; }
+      const fname = enc.encode(name);
+      const { time, date } = dosTime(mtime);
+      const h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); // UTF-8 names
+      h.setUint16(8, method, true); h.setUint16(10, time, true); h.setUint16(12, date, true);
+      h.setUint32(14, crc, true); h.setUint32(18, body.length, true); h.setUint32(22, raw.length, true);
+      h.setUint16(26, fname.length, true);
+      central.push({ fname, method, time, date, crc, csize: body.length, size: raw.length, offset });
+      await put(new Uint8Array(h.buffer)); await put(fname); await put(body);
+    },
+    async finish() {
+      const start = offset;
+      for (const e of central) {
+        const big = e.offset >= 0xffffffff;
+        const extra = big ? new DataView(new ArrayBuffer(12)) : null;
+        if (big) { extra.setUint16(0, 1, true); extra.setUint16(2, 8, true); extra.setBigUint64(4, BigInt(e.offset), true); }
+        const h = new DataView(new ArrayBuffer(46));
+        h.setUint32(0, 0x02014b50, true); h.setUint16(4, 45, true); h.setUint16(6, big ? 45 : 20, true);
+        h.setUint16(8, 0x0800, true); h.setUint16(10, e.method, true); h.setUint16(12, e.time, true); h.setUint16(14, e.date, true);
+        h.setUint32(16, e.crc, true); h.setUint32(20, e.csize, true); h.setUint32(24, e.size, true);
+        h.setUint16(28, e.fname.length, true); h.setUint16(30, big ? 12 : 0, true);
+        h.setUint32(42, big ? 0xffffffff : e.offset, true);
+        await put(new Uint8Array(h.buffer)); await put(e.fname);
+        if (big) await put(new Uint8Array(extra.buffer));
+      }
+      const size = offset - start;
+      const zip64 = start >= 0xffffffff || central.length >= 0xffff;
+      if (zip64) {
+        const r = new DataView(new ArrayBuffer(56));
+        r.setUint32(0, 0x06064b50, true); r.setBigUint64(4, 44n, true); r.setUint16(12, 45, true); r.setUint16(14, 45, true);
+        r.setBigUint64(24, BigInt(central.length), true); r.setBigUint64(32, BigInt(central.length), true);
+        r.setBigUint64(40, BigInt(size), true); r.setBigUint64(48, BigInt(start), true);
+        const l = new DataView(new ArrayBuffer(20)); // locator: where the record above starts
+        l.setUint32(0, 0x07064b50, true); l.setBigUint64(8, BigInt(offset), true); l.setUint32(16, 1, true);
+        await put(new Uint8Array(r.buffer));
+        await put(new Uint8Array(l.buffer));
+      }
+      const e = new DataView(new ArrayBuffer(22));
+      e.setUint32(0, 0x06054b50, true);
+      e.setUint16(8, Math.min(central.length, 0xffff), true); e.setUint16(10, Math.min(central.length, 0xffff), true);
+      e.setUint32(12, Math.min(size, 0xffffffff), true); e.setUint32(16, zip64 ? 0xffffffff : start, true);
+      await put(new Uint8Array(e.buffer));
+    },
+  };
+}
+
+async function sdFile(path) {
+  return sd.root ? (await sdHandle(path)).getFile() : sd.fileMap.get(path);
+}
+
+async function sdBackup() {
+  const { files } = await sdScan();
+  if (!files.length) { toast(t("sd.backup.empty"), "error"); return; }
+  const total = files.reduce((a, f) => a + f.size, 0);
+  const unsaved = SLOTS.filter((s) => panes[s].sdPath && panes[s].summary?.dirty);
+  const ok1 = await openDialog(
+    `<h3>${esc(t("sd.backup.title"))}</h3>` +
+    `<div class="msg">${esc(t("sd.backup.msg", { n: files.length, size: human(total) }))}</div>` +
+    (unsaved.length ? `<div class="warnbox">${esc(t("sd.backup.unsaved"))}</div>` : "") +
+    `<div class="msg small">${esc(t("sd.backup.restore"))}</div>` + actionsHtml(t("sd.backup.go")),
+    () => true,
+  );
+  if (!ok1) return;
+  const stamp = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
+  const name = `${sd.name.replace(/[^\w.-]+/g, "_") || "SD"}-backup-${stamp}.zip`;
+  // straight to disk where possible; otherwise kept in memory (compressed) and downloaded
+  let writable = null;
+  if (window.showSaveFilePicker) {
+    try {
+      const h = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: "ZIP", accept: { "application/zip": [".zip"] } }] });
+      writable = await h.createWritable();
+    } catch (e) {
+      if (e.name === "AbortError") return;
+      writable = null;
+    }
+  }
+  const parts = [];
+  await run("sd.backup.progress", { done: 0, n: files.length, pct: 0 }, async () => {
+    const zip = zipWriter(async (u8) => (writable ? writable.write(u8) : parts.push(u8)));
+    let done = 0, bytes = 0;
+    try {
+      for (const f of files) {
+        const file = await sdFile(f.path);
+        await zip.add(f.path, new Uint8Array(await file.arrayBuffer()), file.lastModified);
+        done++; bytes += f.size;
+        status("sd.backup.progress", { done, n: files.length, pct: Math.round((bytes / Math.max(1, total)) * 100) });
+      }
+      await zip.finish();
+    } catch (e) {
+      if (writable) await writable.abort().catch(() => {});
+      throw e;
+    }
+    if (writable) await writable.close();
+    else download(name, new Blob(parts, { type: "application/zip" }), "application/zip");
+    status("sd.backup.done", { name, n: files.length });
+    toast(t("sd.backup.done", { name, n: files.length }));
+  });
+}
+
+// ---------------------------------------------------------------------------
+// "All saves": every save on every card of the SD in one list. Each card is read
+// once (only its directory) and remembered until it changes on the SD.
+
+function sdChannels() {
+  const out = [];
+  for (const v of sd.data.variants) {
+    for (const f of v.folders) {
+      for (const c of f.channels) out.push({ variant: v.name, vlabel: v.label, folder: f.folder, flabel: f.label, kind: f.kind, number: c.number, chName: c.name, path: c.path });
+    }
+  }
+  return out;
+}
+
+async function sdIndexSaves() {
+  sd.index = sd.index || new Map(); // path -> {sig, platform, saves, error}
+  const chans = sdChannels();
+  let i = 0;
+  for (const ch of chans) {
+    i++;
+    status("sd.all.reading", { i, n: chans.length });
+    let file;
+    try { file = await sdFile(ch.path); } catch { continue; }
+    if (!file) continue;
+    const sig = `${file.size}:${file.lastModified}`;
+    if (sd.index.get(ch.path)?.sig === sig) continue;
+    const buf = await file.arrayBuffer();
+    const r = await rpc("sdIndexCard", [buf], [buf]);
+    sd.index.set(ch.path, r.ok ? { sig, platform: r.platform, saves: r.saves } : { sig, saves: [], error: r.error });
+  }
+  for (const path of [...sd.index.keys()]) if (!chans.some((c) => c.path === path)) sd.index.delete(path);
+  const rows = [];
+  for (const ch of chans) {
+    const ix = sd.index.get(ch.path);
+    if (!ix) continue;
+    for (const sv of ix.saves) rows.push({ ...sv, platform: ix.platform, ch });
+  }
+  // the same save folder on more than one card
+  const count = new Map();
+  for (const r of rows) { const k = `${r.platform}:${r.name}`; count.set(k, (count.get(k) || 0) + 1); }
+  for (const r of rows) r.copies = count.get(`${r.platform}:${r.name}`);
+  return { rows, cards: chans.length, failed: chans.filter((c) => sd.index.get(c.path)?.error).length };
+}
+
+async function sdAllSaves() {
+  let data = null;
+  await run("sd.all.reading", { i: 0, n: 0 }, async () => {
+    await loadGameDb();
+    data = await sdIndexSaves();
+    status("sd.all.ready", { n: data.rows.length, cards: data.cards });
+  });
+  if (!data) return;
+  const { rows } = data;
+  const where = (ch) => `${ch.vlabel} · ${gameName(ch.folder) || ch.flabel} · ${t("sd.all.channel", { n: ch.number })}${ch.chName ? ` (${ch.chName})` : ""}`;
+  for (const r of rows) {
+    r.game = gameName(r.serial) || "";
+    r.where = where(r.ch);
+    r.hay = fold(`${r.name} ${r.title} ${r.serial || ""} ${(r.serial || "").replace("-", "")} ${r.game} ${r.where} ${r.ch.folder}`);
+  }
+  rows.sort((a, b) => (a.game || a.title || a.name).localeCompare(b.game || b.title || b.name) || a.where.localeCompare(b.where));
+  const dups = rows.filter((r) => r.copies > 1).length;
+  const list = (q, onlyDups) => {
+    const words = fold(q).split(/\s+/).filter(Boolean);
+    const shown = rows.filter((r) => (!onlyDups || r.copies > 1) && words.every((w) => r.hay.includes(w)));
+    const body = shown.map((r) =>
+      `<button type="submit" class="as-row" value="open:${rows.indexOf(r)}" title="${esc(t("sd.all.openTip"))}">` +
+      `<span class="as-title"><b>${esc(r.title || r.name)}</b>` +
+      `<small>${esc([r.game && r.game !== r.title ? r.game : "", r.serial || "", r.name].filter(Boolean).join(" · "))}</small></span>` +
+      `<span class="as-where">${esc(r.where)}</span>` +
+      `<span class="as-size">${esc(r.platform === "PS1" ? blocksLabel(Math.max(1, Math.round(r.size / 8192))) : human(r.size))}</span>` +
+      (r.copies > 1 ? `<span class="tag" title="${esc(t("sd.all.dupTip", { n: r.copies }))}">${esc(t("sd.all.dup", { n: r.copies }))}</span>` : `<span></span>`) +
+      `</button>`).join("");
+    return { html: body || `<div class="tree-empty">${esc(t(words.length ? "filter.none" : "sd.all.none", { q: q.trim() }))}</div>`, n: shown.length };
+  };
+  const first = list("", false);
+  const pr = openDialog(
+    `<h3>${esc(t("sd.all.title"))}</h3>` +
+    `<div class="msg small">${esc(t("sd.all.summary", { n: rows.length, cards: data.cards, dups }))}` +
+    (data.failed ? ` ${esc(t("sd.all.failed", { n: data.failed }))}` : "") + `</div>` +
+    `<div class="as-tools"><div class="tree-filter"><span class="filter-icon">${svg("search")}</span>` +
+    `<input type="search" name="q" placeholder="${esc(t("filter.placeholder"))}" aria-label="${esc(t("filter.label"))}" autocomplete="off" spellcheck="false"></div>` +
+    `<label class="inline"><input type="checkbox" name="dups"${dups ? "" : " disabled"}> ${esc(t("sd.all.onlyDups"))}</label></div>` +
+    `<div class="as-count muted">${esc(t("sd.all.count", { n: first.n }))}</div>` +
+    `<div class="as-list">${first.html}</div>` +
+    `<div class="actions"><button class="btn" value="cancel">${esc(t("dlg.close"))}</button></div>`,
+    (f, btn) => btn,
+  );
+  dialog.classList.add("wide");
+  const refresh = () => {
+    const r = list(dform.q.value, dform.dups.checked);
+    dform.querySelector(".as-list").innerHTML = r.html;
+    dform.querySelector(".as-count").textContent = t("sd.all.count", { n: r.n });
+  };
+  dform.q.addEventListener("input", refresh);
+  dform.dups.addEventListener("change", refresh);
+  dform.q.addEventListener("keydown", (ev) => { if (ev.key === "Enter") ev.preventDefault(); });
+  dform.q.focus();
+  const res = await pr;
+  dialog.classList.remove("wide");
+  if (!res || !String(res).startsWith("open:")) return;
+  const r = rows[+String(res).slice(5)];
+  await sdOpenChannel(r.ch.variant, r.ch.path);
+  const p = panes[sdOpenSlot(r.ch.path) || state.active];
+  if (!p?.summary) return;
+  sd.expanded.add(`${r.ch.variant}/${r.ch.folder}`);
+  renderSd();
+  const e = p.summary.tree.find((x) => x.name === r.name && !x.deleted);
+  if (e) select(p, e.path);
+}
+
 const sdOpenSlot = (path) => SLOTS.find((s) => panes[s].sdPath === path) || null;
 const sdVariant = (name) => sd.data.variants.find((v) => v.name === name);
 const sdFolder = (variant, folder) => sdVariant(variant)?.folders.find((f) => f.folder === folder);
@@ -1771,7 +2063,9 @@ function renderSd() {
     `<div class="sd-tools">` +
     `<button data-sd="settings" ${dis}><i data-icon="gear"></i>${esc(t("sd.settings"))}</button>` +
     `<button data-sd="g2f" ${dis}><i data-icon="link"></i>${esc(t("sd.g2f"))}</button>` +
-    `<button data-sd="refresh" ${state.busy ? "disabled" : ""}><i data-icon="reload"></i>${esc(t("sd.refresh"))}</button></div>`;
+    `<button data-sd="refresh" ${state.busy ? "disabled" : ""}><i data-icon="reload"></i>${esc(t("sd.refresh"))}</button>` +
+    `<button data-sd="allsaves" ${state.busy || !sd.data ? "disabled" : ""}><i data-icon="list"></i>${esc(t("sd.allSaves"))}</button>` +
+    `<button data-sd="backup" ${state.busy || !sd.data ? "disabled" : ""} title="${esc(t("sd.backup.tip"))}"><i data-icon="archive"></i>${esc(t("sd.backup"))}</button></div>`;
   if (ro) html += `<div class="sd-note">${esc(t("sd.readOnly"))}</div>`;
   const data = sd.data;
   if (!data) { bar.innerHTML = html; paintIcons(bar); return; }
@@ -1838,6 +2132,8 @@ $("#sdbar").addEventListener("click", (ev) => {
   else if (act === "names") sdChannelNames(el.dataset.variant, el.dataset.folder);
   else if (act === "settings") sdSettings();
   else if (act === "g2f") sdGame2Folder();
+  else if (act === "backup") sdBackup();
+  else if (act === "allsaves") sdAllSaves();
 });
 
 function sdClose() {

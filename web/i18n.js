@@ -69,6 +69,30 @@ const STRINGS = {
     "det.protectedWarn": "Protected folder (e.g. FreeMcBoot/PS2BBL). Deleting or changing it may stop the console from booting from the card.",
 
     "dlg.cancel": "Cancel", "dlg.ok": "OK",
+    "dlg.close": "Close",
+    "filter.placeholder": "Search: name, title, game code…", "filter.label": "Search this card",
+    "filter.none": "Nothing found for “{q}”.",
+    "sd.allSaves": "All saves", "sd.backup": "Backup",
+    "sd.backup.tip": "Save the whole SD card (every memory card and the settings) in one .zip file",
+    "sd.backup.empty": "There is nothing to back up on this SD card.",
+    "sd.backup.title": "Back up the SD card",
+    "sd.backup.msg": "Every memory card and the device settings ({n} files, {size}) go into one .zip file. Empty space on the cards compresses well, so the file is much smaller.",
+    "sd.backup.unsaved": "A card from this SD card has unsaved changes. The backup takes the cards as they are on the SD card, without those changes.",
+    "sd.backup.restore": "To restore, extract the .zip at the root of the SD card (where the MemoryCards folder is) and replace the files.",
+    "sd.backup.go": "Make the backup",
+    "sd.backup.progress": "Backing up: {done} of {n} files ({pct}%)…",
+    "sd.backup.done": "Backup saved: {name} ({n} files).",
+    "sd.all.title": "All saves on the SD card",
+    "sd.all.reading": "Reading the cards on the SD card ({i} of {n})…",
+    "sd.all.ready": "{n} saves on {cards} cards.",
+    "sd.all.summary": "{n} saves on {cards} cards; {dups} of them are on more than one card.",
+    "sd.all.failed": "{n} cards could not be read.",
+    "sd.all.onlyDups": "Only saves on more than one card",
+    "sd.all.count": "{n} shown",
+    "sd.all.none": "No saves on this SD card.",
+    "sd.all.channel": "channel {n}",
+    "sd.all.dup": "on {n} cards", "sd.all.dupTip": "The same save folder is on {n} cards of this SD card.",
+    "sd.all.openTip": "Open this card and select the save",
     "dlg.unsaved.title": "Unsaved changes",
     "dlg.unsaved.msg": "The current card has unsaved changes. Discard them?",
     "dlg.discard": "Discard",
@@ -383,6 +407,30 @@ const STRINGS = {
     "det.protectedWarn": "Pasta protegida (ex.: FreeMcBoot/PS2BBL). Apagar ou alterar pode impedir o console de iniciar pelo cartão.",
 
     "dlg.cancel": "Cancelar", "dlg.ok": "OK",
+    "dlg.close": "Fechar",
+    "filter.placeholder": "Buscar: nome, título, código do jogo…", "filter.label": "Buscar neste cartão",
+    "filter.none": "Nada encontrado para “{q}”.",
+    "sd.allSaves": "Todos os saves", "sd.backup": "Backup",
+    "sd.backup.tip": "Guarda o cartão SD inteiro (todos os memory cards e as configurações) em um arquivo .zip",
+    "sd.backup.empty": "Não há nada para fazer backup neste cartão SD.",
+    "sd.backup.title": "Backup do cartão SD",
+    "sd.backup.msg": "Todos os memory cards e as configurações do aparelho ({n} arquivos, {size}) vão para um arquivo .zip. O espaço vazio dos cartões comprime bem, então o arquivo fica bem menor.",
+    "sd.backup.unsaved": "Um cartão deste SD tem alterações não salvas. O backup pega os cartões como estão no SD, sem essas alterações.",
+    "sd.backup.restore": "Para restaurar, extraia o .zip na raiz do cartão SD (onde fica a pasta MemoryCards) e substitua os arquivos.",
+    "sd.backup.go": "Fazer o backup",
+    "sd.backup.progress": "Fazendo backup: {done} de {n} arquivos ({pct}%)…",
+    "sd.backup.done": "Backup salvo: {name} ({n} arquivos).",
+    "sd.all.title": "Todos os saves do cartão SD",
+    "sd.all.reading": "Lendo os cartões do SD ({i} de {n})…",
+    "sd.all.ready": "{n} saves em {cards} cartões.",
+    "sd.all.summary": "{n} saves em {cards} cartões; {dups} deles estão em mais de um cartão.",
+    "sd.all.failed": "{n} cartões não puderam ser lidos.",
+    "sd.all.onlyDups": "Só saves que estão em mais de um cartão",
+    "sd.all.count": "{n} na lista",
+    "sd.all.none": "Nenhum save neste cartão SD.",
+    "sd.all.channel": "canal {n}",
+    "sd.all.dup": "em {n} cartões", "sd.all.dupTip": "A mesma pasta de save está em {n} cartões deste SD.",
+    "sd.all.openTip": "Abrir este cartão e selecionar o save",
     "dlg.unsaved.title": "Alterações não salvas",
     "dlg.unsaved.msg": "O cartão atual tem alterações não salvas. Descartar?",
     "dlg.discard": "Descartar",
@@ -667,12 +715,13 @@ export function t(key, params) {
   return s;
 }
 
-/** Applies data-i18n / data-i18n-html / data-i18n-title / data-i18n-aria in ``root``. */
+/** Applies data-i18n / -html / -title / -aria / -placeholder in ``root``. */
 export function translateDom(root = document) {
   root.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
   root.querySelectorAll("[data-i18n-html]").forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
   root.querySelectorAll("[data-i18n-title]").forEach((el) => { el.title = t(el.dataset.i18nTitle); });
   root.querySelectorAll("[data-i18n-aria]").forEach((el) => { el.setAttribute("aria-label", t(el.dataset.i18nAria)); });
+  root.querySelectorAll("[data-i18n-placeholder]").forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
 }
 
 // Exposed for a consistency test (same keys in every language).
