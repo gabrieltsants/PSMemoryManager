@@ -585,3 +585,59 @@ def test_cli(tmp_path, capsys):
     freepsx = tmp_path / "boot.mcd"
     freepsx.write_bytes(freepsxboot_like())
     assert main([str(freepsx), "import", str(DATA / "tonyhax.mcs")]) == 1  # read-only
+
+
+# ---------------------------------------------------------------------------
+# the FreePSXBoot trigger is told apart from real saves
+
+
+def test_freepsxboot_trigger_is_marked_and_not_exported(tmp_path):
+    p = tmp_path / "boot.mcd"
+    p.write_bytes(freepsxboot_like())
+    c = ps1.Ps1Card(p)
+    [e] = c.saves()
+    assert e.exploit and c.directory().freepsxboot
+    with pytest.raises(CardError):
+        c.export_save(e.path)
+
+
+def test_valid_save_named_freepsxboot_is_a_normal_save(tmp_path):
+    c = blank(tmp_path)
+    sf = ps1.load_save((DATA / "tonyhax.mcs").read_bytes()).renamed("FreePSXBoot")
+    with c.edit() as ed:
+        ed.import_save(sf)
+    d = c.directory()
+    assert not d.freepsxboot and not d.nonstandard and not c.read_only
+    [e] = c.saves()
+    assert not e.exploit and e.problems == [] and c.export_save(e.path).data == sf.data
+
+
+def test_really_broken_save_still_reports_its_problems(tmp_path):
+    c = blank(tmp_path)
+    with c.edit() as ed:
+        ed.import_save(ps1.load_save((DATA / "gran-turismo-BASCUS-94194RT.srm").read_bytes(), "x-BASCUS-94194RT.srm"))
+        ed.import_save(ps1.load_save((DATA / "tonyhax.mcs").read_bytes()))  # another exploit, but a normal save
+    raw = bytearray(c.path.read_bytes())
+    f = bytearray(raw[128 * 2:128 * 3])  # second block of the 3-block save: point it nowhere
+    f[8:10] = struct.pack("<H", 0x40)
+    f[127] = ps1._xor(f)
+    raw[128 * 2:128 * 3] = f
+    c.path.write_bytes(raw)
+    c.reload()
+    saves = {s.name: s for s in c.saves()}
+    gt, thx = saves["BASCUS-94194RT"], saves["BESLEM-99999TONYHAX"]
+    assert not gt.exploit and "ps1.p.bad_link" in gt.problems
+    assert not thx.exploit and thx.problems == []
+    ok, msgs = c.check()
+    assert not ok and any("BASCUS-94194RT" in m for m in msgs)
+    assert not c.directory().freepsxboot
+
+
+def test_web_hides_trigger_problems_only(tmp_path, monkeypatch):
+    w, call, stage, open_ = _web(tmp_path, monkeypatch)
+    w.INCOMING.write_bytes(freepsxboot_like())
+    r = call("open_card", "A", "BootCard-1.mcd")
+    [e] = r["tree"]
+    assert e["exploit"] and e["problems"] == [] and r["card"]["readOnly"] and r["card"]["freepsxboot"]
+    assert call("export_saves", "A", '["/1"]', "mcs")["kind"] == "card"
+    assert not call("check", "A")["healthy"]  # Check still lists the technical details

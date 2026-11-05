@@ -327,6 +327,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "{name} is deleted. Restore it before exporting.",
         "pt": "{name} está apagado. Restaure-o antes de exportar.",
     },
+    "ps1.export_exploit": {
+        "en": "{name} is the FreePSXBoot trigger, not a save: it only works inside its card. Copy or convert the whole card instead.",
+        "pt": "{name} é o gatilho do FreePSXBoot, não um save: só funciona dentro do próprio cartão. Copie ou converta o cartão inteiro.",
+    },
     "ps1.platform_mismatch": {
         "en": "Saves can only be copied between cards of the same console (PS1 or PS2).",
         "pt": "Saves só podem ser copiados entre cartões do mesmo console (PS1 ou PS2).",

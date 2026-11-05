@@ -457,6 +457,7 @@ function renderPs1Row(p, e) {
   const tags =
     (e.deleted ? `<span class="tag del" title="${esc(t(e.restorable ? "tree.deletedTip" : "tree.goneTip"))}">${esc(t("tree.deleted"))}</span>` : "") +
     (e.pocketstation ? `<span class="tag">PocketStation</span>` : "") +
+    (e.exploit ? `<span class="tag">${esc(t("tree.exploit"))}</span>` : "") +
     (e.problems.length && !e.deleted ? `<span class="lock" title="${esc(t("tree.problems"))}">${svg("warn")}</span>` : "");
   return `<div class="${cls.join(" ")}" role="treeitem" draggable="${!e.deleted}" aria-level="1" aria-selected="${p.selected.has(e.path)}" data-path="${esc(e.path)}">` +
     `<div class="c-name" style="padding-left:8px"><span class="ricon ps1">${ps1IconHtml(e)}</span>` +
@@ -522,7 +523,7 @@ function renderPs1Details(p, el, sel) {
     if (c.container === "vmp") rows.push([t("det.ps1.signature"), t(c.signed === false ? "det.ps1.sigBad" : "det.ps1.sigOk")]);
     rows.push([t("det.file"), human(c.fileSize)]);
     el.innerHTML = `<h2>${esc(c.name)}</h2><div class="path">${esc(c.describe)}</div>` + dl(rows) +
-      (c.readOnly ? `<div class="warnbox">${esc(t(c.freepsxboot ? "det.ps1.freepsxboot" : "det.ps1.readOnly"))}</div>` : "") +
+      (c.readOnly ? `<div class="${c.freepsxboot ? "notebox" : "warnbox"}">${esc(t(c.freepsxboot ? "det.ps1.freepsxboot" : "det.ps1.readOnly"))}</div>` : "") +
       `<p class="hint">${esc(t("det.ps1.hint"))}</p>`;
     return;
   }
@@ -540,7 +541,7 @@ function renderPs1Details(p, el, sel) {
     if (e.region) rows.push([t("det.region"), e.region]);
   }
   rows.push([t("det.ps1.saveName"), e.name]);
-  rows.push([t("det.type"), t(e.pocketstation ? "det.ps1.pocket" : "det.type.ps1save")]);
+  rows.push([t("det.type"), t(e.exploit ? "det.ps1.exploitType" : e.pocketstation ? "det.ps1.pocket" : "det.type.ps1save")]);
   rows.push([t("det.size"), `${blocksLabel(e.blocks.length)} (${human(e.size)})`]);
   rows.push([t("det.ps1.blockList"), blockRanges(e.blocks)]);
   if (e.icon) rows.push([t("det.ps1.iconFrames"), t("det.ps1.iconValue", { n: e.icon.n })]);
@@ -548,6 +549,7 @@ function renderPs1Details(p, el, sel) {
   if (e.comment) rows.push([t("det.ps1.comment"), e.comment]);
   el.innerHTML =
     `<div class="ps1-head">${ps1IconHtml(e, "ps1-big")}<h2>${esc(e.title || e.name)}</h2></div>` + dl(rows) +
+    (e.exploit ? `<div class="notebox">${esc(t("det.ps1.exploitNote"))}</div>` : "") +
     (e.problems.length ? `<div class="warnbox">${e.problems.map(esc).join("<br>")}</div>` : "") +
     (e.deleted && e.restorable && !c.readOnly ? `<div class="det-actions"><button class="btn" data-act="restore">${esc(t("act.restore"))}</button></div>` : "");
 }
@@ -597,7 +599,7 @@ function renderDetails(p) {
 // selected root-level folders that only contain files (= exportable saves); PS1: the selected saves not deleted
 function selectedSaves(p) {
   const sel = [...p.selected].map((x) => p.byPath.get(x)).filter(Boolean);
-  if (isPs1(p)) return sel.length && sel.every((e) => !e.deleted) ? sel.map((e) => e.path) : [];
+  if (isPs1(p)) return sel.length && sel.every((e) => !e.deleted && !e.exploit) ? sel.map((e) => e.path) : [];
   if (!sel.length || !sel.every((e) => e.dir && e.flat && p.parentOf.get(e.path) === "/")) return [];
   return sel.map((e) => e.path);
 }

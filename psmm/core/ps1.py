@@ -319,6 +319,7 @@ class Ps1Entry:
     problems: list[str] = field(default_factory=list)  # message keys
     restorable: bool = False
     comment: str = ""
+    exploit: bool = False  # the FreePSXBoot trigger entry (not a save)
 
     @property
     def path(self) -> str:
@@ -401,8 +402,6 @@ def parse_directory(raw: bytes, comments: list[str] | None = None) -> Directory:
         size, nxt = struct.unpack_from("<IH", f, 4)
         name_raw = f[10:10 + NAME_LEN + 1].split(b"\0", 1)[0]
         name = name_raw.decode("ascii", "replace")
-        if b"FreePSXBoot" in f[10:31] or b"FREEPSXBOOT" in f[10:31].upper():
-            d.freepsxboot = True
         chain = [b]
         problems: list[str] = []
         cur, cur_next = b, nxt
@@ -433,11 +432,16 @@ def parse_directory(raw: bytes, comments: list[str] | None = None) -> Directory:
         first = _block(raw, b)
         if first[:2].upper() != b"SC":
             problems.append("ps1.p.no_title")
+        # FreePSXBoot: an entry with its name whose directory is broken on purpose
+        # (a valid save that only happens to have that name is left alone)
+        exploit = not deleted and b"FREEPSXBOOT" in name_raw.upper() and bool(problems or unknown)
+        if exploit:
+            d.freepsxboot = True
         entry = Ps1Entry(
             block=b, blocks=chain, name=name, title=decode_title(first[4:68]) if first[:2].upper() == b"SC" else "",
             declared_size=size, deleted=deleted, icon=read_icon(first),
             pocketstation=_is_pocketstation(name_raw, first), problems=problems,
-            comment=(comments[b - 1] if comments else ""),
+            comment=(comments[b - 1] if comments else ""), exploit=exploit,
         )
         d.saves.append(entry)
         if not deleted:
@@ -870,6 +874,8 @@ class Ps1Card:
         s = self.find(path)
         if s.deleted:
             raise CardError("ps1.export_deleted", name=s.name)
+        if s.exploit:
+            raise CardError("ps1.export_exploit", name=s.name)
         return _export(self.raw, s)
 
     def total_bytes(self) -> int:

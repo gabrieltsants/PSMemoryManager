@@ -119,8 +119,10 @@ def _ps1_entry_dict(e: "_ps1.Ps1Entry") -> dict:
         "restorable": e.restorable,
         "pocketstation": e.pocketstation,
         "icon": e.icon.to_dict() if e.icon else None,
-        "problems": [_t(p, name=e.name, block=e.block) for p in e.problems],
+        # the FreePSXBoot trigger is broken on purpose: its "problems" are not problems
+        "problems": [] if e.exploit else [_t(p, name=e.name, block=e.block) for p in e.problems],
         "comment": e.comment,
+        "exploit": e.exploit,
     }
 
 

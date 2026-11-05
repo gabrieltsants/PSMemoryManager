@@ -377,6 +377,7 @@ def ps1_main(card_path: str, argv: list[str], backups: bool) -> int:
     if a.cmd == "ls":
         for s in card.saves():
             state = f"  [{t('cli.ps1_restorable' if s.restorable else 'cli.ps1_deleted')}]" if s.deleted else ""
+            state = "  [FreePSXBoot]" if s.exploit else state
             blocks = ",".join(map(str, s.blocks))
             print(f"{s.block:>3}  {len(s.blocks):>2} bl  {s.name:<21} {s.title}{state}  ({blocks})")
         free = len(card.directory().free_blocks())
@@ -391,7 +392,7 @@ def ps1_main(card_path: str, argv: list[str], backups: bool) -> int:
     if a.cmd == "export":
         out = Path(a.output)
         out.mkdir(parents=True, exist_ok=True)
-        wanted = [_ps1_find(card, r) for r in a.saves] if a.saves else card.directory().live()
+        wanted = [_ps1_find(card, r) for r in a.saves] if a.saves else [s for s in card.directory().live() if not s.exploit]
         for s in wanted:
             sf = card.export_save(s.path)
             dest = out / ps1.export_filename(sf, a.format)
