@@ -12,8 +12,6 @@ Prefer a program on your computer? **[Download the local app](https://github.com
 
 > **Before editing:** back up your memory cards and the whole SD card first. PSMemoryManager is provided as-is and used at your own risk. The project and its contributors are not responsible for lost or corrupted saves, damaged cards, or other data loss or damage resulting from its use.
 
-![PSMemoryManager showing a Gen2 SD card, its memory cards and the saves on an open card](docs/img/hero-light.png)
-
 ## What you can do
 
 - **See what is on a card:** every save with its game name, icon, size and region, and how much space is left. PS2 saves show their 3D icons, animated like on the console. Type in the search box to find a save by name, title or game code.
@@ -28,6 +26,8 @@ Prefer a program on your computer? **[Download the local app](https://github.com
 ![A PS2 card with the saves' 3D icons in the list and the Silent Hill 2 icon turning in the details panel](docs/img/ps2-icons.gif)
 
 ![Copying a save between two memory cards](docs/img/two-cards.gif)
+
+![PSMemoryManager showing a Gen2 SD card, its memory cards and the saves on an open card](docs/img/hero-light.png)
 
 It works on computers and phones, in light or dark mode, in English or Portuguese (it follows your browser language; you can change it in the top bar).
 
