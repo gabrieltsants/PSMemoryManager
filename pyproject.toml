@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "psmemorymanager"
-version = "0.1.0"
+version = "0.1.1"
 description = "PS2 and PS1 memory card manager (PSxMemCard Gen2, OPL, PCSX2, MemCard PRO2, DexDrive, PSP/Vita) - web and command line"
 readme = "README.md"
 license = "GPL-3.0-or-later"
