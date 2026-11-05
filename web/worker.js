@@ -5,7 +5,12 @@
 // the page. Everything runs locally in the browser; no file leaves the PC.
 
 const PYODIDE_VERSION = "0.27.2";
-const PYODIDE_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
+// tools/build_site.py --offline sets this to true: the local app ships Pyodide
+// next to the page, so it works without internet
+const PYODIDE_LOCAL = false;
+const PYODIDE_URL = PYODIDE_LOCAL
+  ? new URL("pyodide/", self.location.href).href
+  : `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 const BUILD = "__BUILD__"; // filled in by tools/build_site.py
 
 importScripts(PYODIDE_URL + "pyodide.js");

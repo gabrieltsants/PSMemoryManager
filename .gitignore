@@ -6,3 +6,6 @@ dist/
 *.egg-info/
 .pytest_cache/
 _site/
+.cache/
+launcher/site/*
+!launcher/site/.keep

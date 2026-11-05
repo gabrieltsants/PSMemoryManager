@@ -28,7 +28,8 @@ The page needs to be served over HTTP (not opened as a file), because it loads P
 - `psmm/web_api.py`: bridge used by the web page. Every function returns JSON.
 - `psmm/cli.py`: command line.
 - `web/`: the page (HTML/CSS/JS, no build step). Pyodide runs in a Web Worker (`worker.js`). UI strings are in `web/i18n.js`.
-- `tools/`: `build_site.py` (site build), `update_gamedb.py` (regenerates `psmm/data/gamedb.json` from PCSX2's GameIndex), `readme_media.py` (README screenshots and GIF).
+- `launcher/`: the local app (Go). One executable that embeds the page and serves it on 127.0.0.1; see [Local app](#local-app).
+- `tools/`: `build_site.py` (site build), `build_local.py` and `fetch_pyodide.py` (local app), `update_gamedb.py` (regenerates `psmm/data/gamedb.json` from PCSX2's GameIndex), `readme_media.py` (README screenshots and GIF).
 - `tests/`: pytest suite. `tests/data/ps1/` holds real PS1 files (see its README). Some tests also use a Gen2 SD card dump at `~/psxmemcard_novo` (or `PSMM_SAMPLES`) and are skipped without it.
 
 ## Publishing
@@ -36,6 +37,22 @@ The page needs to be served over HTTP (not opened as a file), because it loads P
 `.github/workflows/pages.yml` runs the tests and, if they pass, builds the site and pushes it to the `gh-pages` branch (served by GitHub Pages) on every push to `main`.
 
 `tools/build_site.py` stamps a build id (a hash of the site's content) into every asset URL (`app.js?v=<id>`) and writes `version.json`. Source files use the `__BUILD__` placeholder, and any new asset URL or `fetch` in `web/` must carry `?v=__BUILD__`. The page checks `version.json` when it opens, when the tab becomes visible again and every 10 minutes. On a new deploy it reloads by itself if nothing is open, or shows an "update now" bar, so open cards are never lost.
+
+## Local app
+
+The local app is the same page in a single executable, for people who prefer not to use the website. It needs nothing installed and works without internet.
+
+```bash
+python tools/build_local.py --target linux-x86_64   # or no --target for every system; needs Go 1.22+
+./dist/PSMemoryManager-<version>-linux-x86_64       # --no-browser, --port N, --version
+```
+
+- `tools/build_local.py` builds the site with `build_site.py --offline`, gzips every file into `launcher/site/` and compiles `launcher/` into `dist/`. The executable is static (no CGO).
+- `--offline` copies Pyodide into the site and switches `PYODIDE_LOCAL` in `web/worker.js`, so nothing comes from the CDN. `tools/fetch_pyodide.py` downloads it from the official npm package, pinned by version and SHA-256, into `.cache/`. Keep its `VERSION` in step with `PYODIDE_VERSION` in `web/worker.js` (the build checks).
+- The launcher listens on `127.0.0.1:47820` only. The port is fixed so the browser keeps the language and theme; if the port is taken by another program it uses a free one, and if PSMemoryManager is already running it just opens the browser again. It answers only requests whose `Host` is its own address (against DNS rebinding) and only `GET`/`HEAD`.
+- Files are stored gzipped and sent as they are (`Content-Encoding: gzip`), with the build as ETag.
+- The page gets a small script (`/__psmm/local.js`) that keeps a Server-Sent Events connection open. The app quits 45 s after the last tab closes (5 min if no tab ever connects). If it is gone, the page shows a note: what is open keeps working, since everything runs in the browser, but reloading needs the app again.
+- `launcher/site/.keep` lets `go vet`/`go test` run without a packed site (CI does this).
 
 ## Translations
 
@@ -45,10 +62,11 @@ The interface is in English (default) and Portuguese. Core messages are keys in 
 
 ```bash
 python tools/build_site.py && python -m http.server -d _site 8765 &
-python tools/readme_media.py --url http://127.0.0.1:8765/ --sd DEMO_SD [--vmc A.bin B.bin]
+python tools/readme_media.py --url http://127.0.0.1:8765/ --sd DEMO_SD [--vmc A.bin B.bin] [--icon-card CARD]
+python tools/readme_media.py --url http://127.0.0.1:8765/ --icon-card CARD --only ps2-icons
 ```
 
-`DEMO_SD` is copied into the browser's private storage; the folder itself is never modified. It needs Playwright and ffmpeg.
+`DEMO_SD` is copied into the browser's private storage; the folder itself is never modified. It needs Playwright, ffmpeg and a GPU (PS2 icons are not drawn with software WebGL). `CARD` is a PS2 card with an animated icon; `ps2-icons.gif` shows the save named by `--icon-save` (Silent Hill 2 by default) turning once, with the page clock driven by hand so the loop is seamless.
 
 ## History
 

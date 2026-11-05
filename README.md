@@ -6,6 +6,8 @@ A **PlayStation 2 and PlayStation 1 memory card manager that runs in your browse
 
 **[Open PSMemoryManager](https://gabrieltsants.github.io/PSMemoryManager/)** — nothing to install.
 
+Prefer a program on your computer? **[Download the local app](https://github.com/gabrieltsants/PSMemoryManager/releases/latest)** (Linux; Windows coming soon): the same PSMemoryManager in a single file, nothing to install and no internet needed.
+
 > Your files never leave your computer: everything is processed in the browser. Nothing is uploaded to a server.
 
 > **Before editing:** back up your memory cards and the whole SD card first. PSMemoryManager is provided as-is and used at your own risk. The project and its contributors are not responsible for lost or corrupted saves, damaged cards, or other data loss or damage resulting from its use.
@@ -14,7 +16,7 @@ A **PlayStation 2 and PlayStation 1 memory card manager that runs in your browse
 
 ## What you can do
 
-- **See what is on a card:** every save with its game name, icon, size and region, and how much space is left.
+- **See what is on a card:** every save with its game name, icon, size and region, and how much space is left. PS2 saves show their 3D icons, animated like on the console.
 - **Move saves around:** open two cards side by side and drag saves from one to the other.
 - **Back up and restore saves:** export saves to files and import them again, on the same card or another one.
 - **Clean up:** delete saves, folders and files. Every change can be undone until you save. On PS1 cards, a deleted save can even be restored later, like on the console.
@@ -22,6 +24,8 @@ A **PlayStation 2 and PlayStation 1 memory card manager that runs in your browse
 - **Convert cards** between devices and emulators, merge cards, or split a card into one card per game.
 - **Manage a PSxMemCard Gen2 / SD2PSX SD card:** see every card and channel, open and save them straight on the SD card, create new ones, name channels and change the device settings.
 - **Check a card** for errors.
+
+![A PS2 card with the saves' 3D icons in the list and the Silent Hill 2 icon turning in the details panel](docs/img/ps2-icons.gif)
 
 ![Copying a save between two memory cards](docs/img/two-cards.gif)
 
@@ -65,6 +69,14 @@ Just open or drag the file: PSMemoryManager recognizes the format by itself. The
 
 **Using a PSxMemCard Gen2 / SD2PSX SD card:** put the SD card in your computer, click **SD card** and pick the root folder of the SD card (the one that has the `MemoryCards` folder). Click a card in the list on the left to open it; **Save** writes it straight back to the SD card.
 
+### Local app (without internet)
+
+1. [Download the local app](https://github.com/gabrieltsants/PSMemoryManager/releases/latest) for your computer: `linux-x86_64` for most PCs, `linux-arm64` for a Raspberry Pi or another ARM board.
+2. Extract it and double-click **PSMemoryManager** (or run `./PSMemoryManager` in a terminal). Your browser opens with the app, exactly like the website.
+3. When you are done, just close the browser tab: the app closes by itself shortly after.
+
+It only runs on your computer: no other device on the network can reach it. A Windows version is coming soon.
+
 ### Good to know
 
 - **Use Chrome or Edge** to save straight to the original file or to the SD card. Firefox and Safari work too, but they save by downloading a copy, and they open the SD card read-only.
@@ -83,4 +95,4 @@ Shortcuts: `Ctrl+O` open · `Ctrl+S` save · `Ctrl+Z` undo · `Ctrl+E` extract �
 
 ## Credits and license
 
-GPLv3. Uses [mymc++](https://github.com/Adubbz/mymcplusplus) by Florian Märkl and others, based on Ross Ridge's mymc (also GPLv3). PS1 support follows [MemcardRex](https://github.com/ShendoXT/memcardrex) and [vita-mcr2vmp](https://github.com/dots-tb/vita-mcr2vmp) (GPLv3). Game titles come from PCSX2's [GameIndex.yaml](https://github.com/PCSX2/pcsx2/blob/master/bin/resources/GameIndex.yaml) (GPLv3). Inspired by [mcd_viewer](https://github.com/gamebitfunx/mcdviewer), made for the PSxMemCard Gen2. Full credits are in the [technical details](docs/formats.md#credits).
+GPLv3. Uses [mymc++](https://github.com/Adubbz/mymcplusplus) by Florian Märkl and others, based on Ross Ridge's mymc (also GPLv3). PS1 support follows [MemcardRex](https://github.com/ShendoXT/memcardrex) and [vita-mcr2vmp](https://github.com/dots-tb/vita-mcr2vmp) (GPLv3). Game titles come from PCSX2's [GameIndex.yaml](https://github.com/PCSX2/pcsx2/blob/master/bin/resources/GameIndex.yaml) (GPLv3). The local app includes [Pyodide](https://pyodide.org) (MPL-2.0). Inspired by [mcd_viewer](https://github.com/gamebitfunx/mcdviewer), made for the PSxMemCard Gen2. Full credits are in the [technical details](docs/formats.md#credits).

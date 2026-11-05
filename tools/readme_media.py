@@ -4,11 +4,14 @@
 """Regenerates the README screenshots and GIF (docs/img/).
 
     python tools/build_site.py && python -m http.server -d _site 8765 &
-    python tools/readme_media.py --url http://127.0.0.1:8765/ --sd DEMO_SD [--vmc A.bin B.bin]
+    python tools/readme_media.py --url http://127.0.0.1:8765/ --sd DEMO_SD [--vmc A.bin B.bin] [--icon-card CARD]
+    python tools/readme_media.py --url ... --icon-card CARD --only ps2-icons
 
 DEMO_SD is the root of a Gen2 SD card folder to show (it is copied into the
-browser's private storage; the folder itself is never modified). Needs
-Playwright (pip install playwright) and ffmpeg for the GIF.
+browser's private storage; the folder itself is never modified). CARD is a
+PS2 card with an animated 3D icon (the save shown is the one whose title has
+``--icon-save``). Needs Playwright (pip install playwright), ffmpeg for the
+GIFs and a GPU: the page does not draw PS2 icons with software WebGL.
 """
 
 from __future__ import annotations
@@ -23,6 +26,8 @@ from playwright.sync_api import sync_playwright
 
 OUT = Path(__file__).resolve().parent.parent / "docs" / "img"
 VIEW = {"width": 1280, "height": 760}
+# use the real GPU: PS2 icons are not drawn with software WebGL (headless default)
+GPU_ARGS = ["--enable-gpu", "--ignore-gpu-blocklist", "--use-angle=gl"]
 
 MOUNT_SD = """async () => {
   const opfs = await navigator.storage.getDirectory();
@@ -170,6 +175,43 @@ def dual_gif(browser, url, sd):
     pg.context.close()
 
 
+def make_gif(frames: Path, gif: Path, fps: int, width: int) -> None:
+    palette = frames / "palette.png"
+    scale = f"fps={fps},scale={width}:-1:flags=lanczos"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-framerate", str(fps), "-i", frames / "%03d.png",
+                    "-vf", f"{scale},palettegen=max_colors=128:stats_mode=diff", palette], check=True)
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-framerate", str(fps), "-i", frames / "%03d.png", "-i", palette,
+                    "-lavfi", f"{scale} [x]; [x][1:v] paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
+                    gif], check=True)
+
+
+def ps2_icons_gif(browser, url, card, save_title):
+    """A PS2 card with the save icons in the list and one animated 3D icon in the details."""
+    ctx = browser.new_context(viewport={"width": 1100, "height": 640}, locale="en-US", color_scheme="dark",
+                              device_scale_factor=1)
+    pg = ctx.new_page()
+    pg.goto(url)
+    pg.wait_for_selector("#engine.ready", timeout=120000)
+    pg.set_input_files("#pickCard", card)
+    pg.wait_for_selector('.pane[data-slot="A"] .ricon.ps2 img')
+    pg.wait_for_function("document.querySelectorAll('.ricon.ps2 img').length >= document.querySelectorAll('.row .c-title:not(:empty)').length - 1",
+                         timeout=30000)
+    pg.get_by_text(save_title, exact=False).first.click()
+    pg.wait_for_selector("#details canvas.ps2-view")
+    quiet(pg)
+    # drive time by hand: every frame is exactly 1/fps apart, and the GIF ends where it began
+    pg.clock.install()
+    fps, turn = 10, 2 * 3.141592653589793 / 0.6  # the view turns 0.6 rad/s
+    frames = Path(tempfile.mkdtemp())
+    n = round(turn * fps)
+    for i in range(n):
+        pg.clock.run_for(1000 // fps)
+        pg.screenshot(path=frames / f"{i:03d}.png")
+    make_gif(frames, OUT / "ps2-icons.gif", fps, 900)
+    shutil.rmtree(frames)
+    ctx.close()
+
+
 def mobile(browser, url, sd):
     ctx = browser.new_context(viewport={"width": 390, "height": 760}, locale="en-US", color_scheme="dark",
                               device_scale_factor=2)
@@ -186,12 +228,20 @@ def mobile(browser, url, sd):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", required=True)
-    ap.add_argument("--sd", required=True)
+    ap.add_argument("--sd")
     ap.add_argument("--vmc", nargs="*", default=[])
+    ap.add_argument("--icon-card", help="PS2 card for ps2-icons.gif")
+    ap.add_argument("--icon-save", default="SILENT HILL 2", help="title of the save shown animated")
+    ap.add_argument("--only", choices=["ps2-icons"], help="make only this picture")
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as p:
-        b = p.chromium.launch()
+        b = p.chromium.launch(args=GPU_ARGS)
+        if a.icon_card:
+            ps2_icons_gif(b, a.url, a.icon_card, a.icon_save)
+        if a.only:
+            b.close()
+            return
         hero(b, a.url, a.sd, "light")
         hero(b, a.url, a.sd, "dark")
         dialogs(b, a.url, a.sd, a.vmc)
