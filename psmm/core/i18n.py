@@ -44,7 +44,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "pt": "Cartões de PS1 ainda não são suportados nesta versão.",
     },
     "fmt.describe_ps2": {"en": "PS2 · {mb} MB · {ecc} · {origin}", "pt": "PS2 · {mb} MB · {ecc} · {origin}"},
-    "fmt.describe_ps1": {"en": "PS1 · 128 KB", "pt": "PS1 · 128 KB"},
+    "fmt.describe_ps1": {"en": "PS1 · 15 blocks · {origin}", "pt": "PS1 · 15 blocos · {origin}"},
     "ecc.yes": {"en": "with ECC", "pt": "com ECC"},
     "ecc.no": {"en": "no ECC", "pt": "sem ECC"},
     "origin.gen2": {"en": "PSxMemCard Gen2 / SD2PSX", "pt": "PSxMemCard Gen2 / SD2PSX"},
@@ -52,6 +52,12 @@ MESSAGES: dict[str, dict[str, str]] = {
     "origin.pcsx2": {"en": "PCSX2", "pt": "PCSX2"},
     "origin.mcp2": {"en": "MemCard PRO2", "pt": "MemCard PRO2"},
     "origin.unknown": {"en": "Unknown", "pt": "Desconhecido"},
+    "origin.epsxe": {"en": "ePSXe / DuckStation / emulators", "pt": "ePSXe / DuckStation / emuladores"},
+    "origin.retroarch": {"en": "RetroArch", "pt": "RetroArch"},
+    "origin.dexdrive": {"en": "DexDrive", "pt": "DexDrive"},
+    "origin.psp": {"en": "PSP / PS Vita", "pt": "PSP / PS Vita"},
+    "origin.vgs": {"en": "Connectix VGS", "pt": "Connectix VGS"},
+    "origin.raw": {"en": "Raw image", "pt": "Imagem crua"},
     # --- regions / attributes -----------------------------------------
     "region.US": {"en": "America", "pt": "América"},
     "region.EU": {"en": "Europe", "pt": "Europa"},
@@ -190,8 +196,8 @@ MESSAGES: dict[str, dict[str, str]] = {
     "change.rename": {"en": "renamed: {path} → {name}", "pt": "renomeado: {path} → {name}"},
     # --- command line -----------------------------------------------------
     "cli.description": {
-        "en": "PS2 memory card manager (PSxMemCard Gen2, OPL, PCSX2, MemCard PRO2).",
-        "pt": "Gerenciador de memory cards de PS2 (PSxMemCard Gen2, OPL, PCSX2, MemCard PRO2).",
+        "en": "PS2 and PS1 memory card manager (PSxMemCard Gen2, OPL, PCSX2, MemCard PRO2, DexDrive, PSP/Vita, emulators).",
+        "pt": "Gerenciador de memory cards de PS2 e PS1 (PSxMemCard Gen2, OPL, PCSX2, MemCard PRO2, DexDrive, PSP/Vita, emuladores).",
     },
     "cli.no_backup": {"en": "do not back up before changing", "pt": "não fazer backup antes de alterar"},
     "cli.lang": {"en": "interface language (en, pt)", "pt": "idioma da interface (en, pt)"},
@@ -211,7 +217,7 @@ MESSAGES: dict[str, dict[str, str]] = {
     "cli.recursive_rm": {"en": "delete non-empty folders", "pt": "apagar pastas com conteúdo"},
     "cli.rename": {"en": "rename file/folder", "pt": "renomear arquivo/pasta"},
     "cli.check": {"en": "check integrity", "pt": "verificar integridade"},
-    "cli.new": {"en": "Create a formatted PS2 card.", "pt": "Criar cartão de PS2 formatado."},
+    "cli.new": {"en": "Create a formatted PS2 card (or PS1 with --ps1).", "pt": "Criar cartão de PS2 formatado (ou de PS1 com --ps1)."},
     "cli.size": {"en": "MB (1-128, default 8)", "pt": "MB (1-128, padrão 8)"},
     "cli.ecc": {"en": "with ECC (PCSX2 format)", "pt": "com ECC (formato PCSX2)"},
     "cli.file": {"en": "File:", "pt": "Arquivo:"},
@@ -255,6 +261,124 @@ MESSAGES: dict[str, dict[str, str]] = {
     "cli.split_others": {"en": "also copy non-game folders into every card",
                          "pt": "copiar também as pastas que não são de jogo para cada cartão"},
     "cli.error": {"en": "error: {error}", "pt": "erro: {error}"},
+    "cli.ps1": {"en": "PS1 card commands (the card format is detected from its content).",
+                "pt": "Comandos para cartões de PS1 (o formato é detectado pelo conteúdo)."},
+    "cli.ps1_saves": {"en": "saves: block numbers (1-15) or save names", "pt": "saves: números de bloco (1-15) ou nomes de save"},
+    "cli.ps1_export": {"en": "export saves", "pt": "exportar saves"},
+    "cli.ps1_format": {"en": "mcs (default) or psv (PS3, signed)", "pt": "mcs (padrão) ou psv (PS3, assinado)"},
+    "cli.ps1_import": {"en": "import saves (.mcs, .psv, .psx, raw) or every save of other PS1 cards",
+                       "pt": "importar saves (.mcs, .psv, .psx, cru) ou todos os saves de outros cartões de PS1"},
+    "cli.ps1_rm": {"en": "delete saves (they can be restored until their blocks are reused)",
+                   "pt": "apagar saves (podem ser restaurados até os blocos serem reutilizados)"},
+    "cli.ps1_restore": {"en": "restore deleted saves", "pt": "restaurar saves apagados"},
+    "cli.ps1_new": {"en": "create a PS1 card (the extension picks the format: .mcd .mcr .srm .gme .vmp .vgs)",
+                    "pt": "criar cartão de PS1 (a extensão define o formato: .mcd .mcr .srm .gme .vmp .vgs)"},
+    "cli.ps1_blocks": {"en": "{used} of 15 blocks used, {free} free", "pt": "{used} de 15 blocos usados, {free} livres"},
+    "cli.ps1_deleted": {"en": "deleted", "pt": "apagado"},
+    "cli.ps1_restorable": {"en": "deleted, can be restored", "pt": "apagado, pode ser restaurado"},
+    # --- PS1 ---------------------------------------------------------------
+    "ps1.truncated": {
+        "en": "Truncated PS1 card image ({size} bytes).",
+        "pt": "Imagem de cartão de PS1 truncada ({size} bytes).",
+    },
+    "ps1.readonly": {
+        "en": "This PS1 card has a non-standard or damaged directory, so it is open read-only: changing it could make it unreadable.",
+        "pt": "Este cartão de PS1 tem um diretório fora do padrão ou danificado, por isso abre só para leitura: alterá-lo poderia deixá-lo ilegível.",
+    },
+    "ps1.freepsxboot": {
+        "en": "FreePSXBoot card: its directory is deliberately non-standard so the exploit works. It is open read-only to keep it working.",
+        "pt": "Cartão FreePSXBoot: o diretório é propositalmente fora do padrão para o exploit funcionar. Ele abre só para leitura para continuar funcionando.",
+    },
+    "ps1.bad_name": {
+        "en": "Invalid PS1 save name: {name} (1 to {max} ASCII characters).",
+        "pt": "Nome de save de PS1 inválido: {name} (de 1 a {max} caracteres ASCII).",
+    },
+    "ps1.save_unknown": {
+        "en": "{name}: not a recognized PS1 save (.mcs, .psx, .psv or raw).",
+        "pt": "{name}: não é um save de PS1 reconhecido (.mcs, .psx, .psv ou cru).",
+    },
+    "ps1.save_is_ps2": {
+        "en": "{name}: this is a PS2 save. Open a PS2 card to import it.",
+        "pt": "{name}: este é um save de PS2. Abra um cartão de PS2 para importá-lo.",
+    },
+    "save.is_ps1": {
+        "en": "{name}: this is a PS1 save. Open a PS1 card to import it.",
+        "pt": "{name}: este é um save de PS1. Abra um cartão de PS1 para importá-lo.",
+    },
+    "ps1.save_size": {
+        "en": "{name}: invalid save size ({size} bytes; 1 to 15 blocks of 8 KB).",
+        "pt": "{name}: tamanho de save inválido ({size} bytes; de 1 a 15 blocos de 8 KB).",
+    },
+    "ps1.no_space": {
+        "en": "Not enough free blocks: {need} needed, {free} free.",
+        "pt": "Blocos livres insuficientes: precisa de {need}, há {free} livres.",
+    },
+    "ps1.already_deleted": {"en": "{name} is already deleted.", "pt": "{name} já está apagado."},
+    "ps1.not_deleted": {"en": "{name} is not deleted.", "pt": "{name} não está apagado."},
+    "ps1.not_restorable": {
+        "en": "{name} cannot be restored: some of its blocks were reused by another save.",
+        "pt": "{name} não pode ser restaurado: parte dos blocos já foi usada por outro save.",
+    },
+    "ps1.restore_exists": {
+        "en": "{name} cannot be restored: the card already has a save with that name.",
+        "pt": "{name} não pode ser restaurado: o cartão já tem um save com esse nome.",
+    },
+    "ps1.export_deleted": {
+        "en": "{name} is deleted. Restore it before exporting.",
+        "pt": "{name} está apagado. Restaure-o antes de exportar.",
+    },
+    "ps1.platform_mismatch": {
+        "en": "Saves can only be copied between cards of the same console (PS1 or PS2).",
+        "pt": "Saves só podem ser copiados entre cartões do mesmo console (PS1 ou PS2).",
+    },
+    "ps1.not_for_ps1": {
+        "en": "PS1 cards have no folders or loose files: this action is for PS2 cards.",
+        "pt": "Cartões de PS1 não têm pastas nem arquivos soltos: esta ação é para cartões de PS2.",
+    },
+    "ps1.chk.magic": {"en": "The card header (\"MC\") is missing.", "pt": "O cabeçalho do cartão (\"MC\") está ausente."},
+    "ps1.chk.header_checksum": {"en": "Wrong checksum in the card header.", "pt": "Checksum errado no cabeçalho do cartão."},
+    "ps1.chk.checksum": {
+        "en": "Wrong checksum in the directory entry of block {block}.",
+        "pt": "Checksum errado na entrada de diretório do bloco {block}.",
+    },
+    "ps1.chk.unknown_state": {
+        "en": "Unknown directory state in block(s) {blocks}.",
+        "pt": "Estado de diretório desconhecido no(s) bloco(s) {blocks}.",
+    },
+    "ps1.chk.cross_link": {
+        "en": "Block {block} belongs to more than one save.",
+        "pt": "O bloco {block} pertence a mais de um save.",
+    },
+    "ps1.chk.lost": {
+        "en": "Block(s) {blocks} marked in use but not part of any save (they count as free).",
+        "pt": "Bloco(s) {blocks} marcado(s) como em uso, mas sem save (contam como livres).",
+    },
+    "ps1.chk.duplicate": {"en": "Two saves are named {name}.", "pt": "Há dois saves com o nome {name}."},
+    "ps1.chk.bad_sectors": {
+        "en": "The card lists broken sectors (normal on worn real cards).",
+        "pt": "O cartão registra setores defeituosos (normal em cartões reais desgastados).",
+    },
+    "ps1.chk.vmp_signature": {
+        "en": "The .vmp signature does not match (the PSP/Vita would reject it). Saving signs it again.",
+        "pt": "A assinatura do .vmp não confere (o PSP/Vita o recusaria). Salvar assina de novo.",
+    },
+    "ps1.p.bad_link": {"en": "{name} (block {block}): invalid link to the next block.", "pt": "{name} (bloco {block}): ligação inválida para o próximo bloco."},
+    "ps1.p.loop": {"en": "{name} (block {block}): its blocks form a loop.", "pt": "{name} (bloco {block}): os blocos formam um ciclo."},
+    "ps1.p.broken_chain": {"en": "{name} (block {block}): its block chain is broken.", "pt": "{name} (bloco {block}): a sequência de blocos está quebrada."},
+    "ps1.p.size": {
+        "en": "{name} (block {block}): the size in the directory does not match its blocks.",
+        "pt": "{name} (bloco {block}): o tamanho no diretório não confere com os blocos.",
+    },
+    "ps1.p.no_title": {
+        "en": "{name} (block {block}): no title/icon frame (\"SC\").",
+        "pt": "{name} (bloco {block}): sem quadro de título/ícone (\"SC\").",
+    },
+    "conv.opl_ps2_only": {
+        "en": "OPL virtual cards are for PS2 games; PS1 cards cannot go in the OPL layout.",
+        "pt": "Os cartões virtuais do OPL são para jogos de PS2; cartões de PS1 não entram no formato do OPL.",
+    },
+    "change.restore": {"en": "save restored: {path}", "pt": "save restaurado: {path}"},
+    "change.format": {"en": "card formatted", "pt": "cartão formatado"},
 }
 
 

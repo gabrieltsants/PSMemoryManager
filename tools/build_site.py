@@ -35,6 +35,8 @@ PY_FILES = [
     "psmm/core/sdcard.py",
     "psmm/core/ecc.py",
     "psmm/core/convert.py",
+    "psmm/core/ps1.py",
+    "psmm/core/signing.py",
 ]
 
 

@@ -216,7 +216,14 @@ def new_card_main(argv: list[str]) -> int:
     p.add_argument("path")
     p.add_argument("-s", "--size", type=int, default=8, help=t("cli.size"))
     p.add_argument("--ecc", action="store_true", help=t("cli.ecc"))
+    p.add_argument("--ps1", action="store_true", help=t("cli.ps1_new"))
     a = p.parse_args(argv)
+    if a.ps1:
+        from .core import ps1
+
+        card = ps1.Ps1Card.create(a.path)
+        print(f"{a.path}: {card.format.describe()}")
+        return 0
     card = MemoryCard.create(a.path, a.size, ecc=a.ecc)
     print(f"{a.path}: {card.format.describe()}")
     card.close()
@@ -263,6 +270,12 @@ def convert_main(argv: list[str]) -> int:
     g.add_argument("--ecc", dest="ecc", action="store_true", default=None, help=t("cli.ecc"))
     g.add_argument("--no-ecc", dest="ecc", action="store_false")
     a = p.parse_args(argv)
+    from .core import ps1
+
+    if ps1.is_ps1_image(a.source):
+        out = ps1.Ps1Card(a.source, make_backups=False).convert(a.dest, ps1.target_for_extension(a.dest))
+        print(f"{out}: {ps1.Ps1Card(out).format.describe()}")
+        return 0
     ecc = a.ecc if a.ecc is not None else convert.TARGETS[convert.target_for_extension(a.dest)][1]
     with MemoryCard(a.source, make_backups=False) as src:
         out = convert.convert(src, a.dest, ecc=ecc, size_mb=a.size or None)
@@ -284,19 +297,126 @@ def split_main(argv: list[str]) -> int:
     p.add_argument("-s", "--size", type=int, default=8, help=t("cli.size"))
     p.add_argument("--with-others", action="store_true", help=t("cli.split_others"))
     a = p.parse_args(argv)
-    with MemoryCard(a.source, make_backups=False) as src, tempfile.TemporaryDirectory() as tmp:
-        cards = convert.split_by_game(src, tmp, size_mb=a.size, include_others=a.with_others)
+    from .core import ps1
+
+    is_ps1 = ps1.is_ps1_image(a.source)
+    variant = "PS1" if is_ps1 else "PS2"
+    src = ps1.Ps1Card(a.source, make_backups=False) if is_ps1 else MemoryCard(a.source, make_backups=False)
+    with src, tempfile.TemporaryDirectory() as tmp:
+        if is_ps1:
+            cards = ps1.split_by_game(src, tmp, include_others=a.with_others)
+        else:
+            cards = convert.split_by_game(src, tmp, size_mb=a.size, include_others=a.with_others)
         for c in cards:
             files, texts = sdcard.scan_local(a.out)
             layout = sdcard.parse_listing(files, texts)
-            v = layout.variant("PS2")
+            v = layout.variant(variant)
             folder = v.find(c["game"]) if v else None
-            plan = (sdcard.plan_new_channel(layout, "PS2", folder.folder) if folder
-                    else sdcard.plan_new_card(layout, "PS2", c["game"]))
+            plan = (sdcard.plan_new_channel(layout, variant, folder.folder) if folder
+                    else sdcard.plan_new_card(layout, variant, c["game"]))
             dest = Path(a.out) / plan["path"]
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(c["path"], dest)
             print(f"{dest}: {', '.join(c['titles'])}")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# PS1 cards
+
+
+def _ps1_find(card, ref: str):
+    """A save by block number ("3") or name ("BASLUS-00067DRAX00")."""
+    from .core import ps1
+
+    if ref.strip("/").isdigit():
+        return card.find("/" + ref.strip("/"))
+    for s in card.saves():
+        if s.name == ref and not s.deleted:
+            return s
+    for s in card.saves():
+        if s.name == ref:
+            return s
+    raise CardError("err.not_found", path=ref)
+
+
+def ps1_main(card_path: str, argv: list[str], backups: bool) -> int:
+    from .core import ps1
+
+    p = argparse.ArgumentParser(prog=f"psmm {card_path}", description=t("cli.ps1"))
+    sub = p.add_subparsers(dest="cmd", required=True, metavar=t("cli.command"))
+    sub.add_parser("info", help=t("cli.info"))
+    sub.add_parser("ls", help=t("cli.ls"))
+    sub.add_parser("check", help=t("cli.check"))
+    s = sub.add_parser("export", help=t("cli.ps1_export"))
+    s.add_argument("saves", nargs="*", help=t("cli.ps1_saves"))
+    s.add_argument("-o", "--output", default=".", help=t("cli.output"))
+    s.add_argument("--format", choices=list(ps1.EXPORT_FORMATS), default="mcs", help=t("cli.ps1_format"))
+    s = sub.add_parser("import", help=t("cli.ps1_import"))
+    s.add_argument("files", nargs="+")
+    s.add_argument("-f", "--overwrite", action="store_true")
+    for name, key in (("rm", "cli.ps1_rm"), ("restore", "cli.ps1_restore")):
+        s = sub.add_parser(name, help=t(key))
+        s.add_argument("saves", nargs="+", help=t("cli.ps1_saves"))
+    a = p.parse_args(argv)
+
+    card = ps1.Ps1Card(card_path, make_backups=backups)
+    if a.cmd == "info":
+        f = card.format
+        d = card.directory()
+        free = len(d.free_blocks())
+        _field("cli.file", str(card.path))
+        _field("cli.format", f.describe())
+        _field("cli.size_label", f"{f.file_size} bytes")
+        _field("cli.space", t("cli.ps1_blocks", used=15 - free, free=free))
+        if f.size_mismatch:
+            print(t("cli.size_mismatch"))
+        if d.nonstandard:
+            print(t("ps1.freepsxboot" if d.freepsxboot else "ps1.readonly"))
+        return 0
+    if a.cmd == "ls":
+        for s in card.saves():
+            state = f"  [{t('cli.ps1_restorable' if s.restorable else 'cli.ps1_deleted')}]" if s.deleted else ""
+            blocks = ",".join(map(str, s.blocks))
+            print(f"{s.block:>3}  {len(s.blocks):>2} bl  {s.name:<21} {s.title}{state}  ({blocks})")
+        free = len(card.directory().free_blocks())
+        print("\n" + t("cli.ps1_blocks", used=15 - free, free=free))
+        return 0
+    if a.cmd == "check":
+        ok, msgs = card.check()
+        for m in msgs:
+            print(m)
+        print(t("cli.check_ok") if ok else t("cli.check_bad"))
+        return 0 if ok else 1
+    if a.cmd == "export":
+        out = Path(a.output)
+        out.mkdir(parents=True, exist_ok=True)
+        wanted = [_ps1_find(card, r) for r in a.saves] if a.saves else card.directory().live()
+        for s in wanted:
+            sf = card.export_save(s.path)
+            dest = out / ps1.export_filename(sf, a.format)
+            dest.write_bytes(ps1.dump_save(sf, a.format))
+            print(dest)
+        return 0
+    with card.edit() as ed:
+        if a.cmd == "import":
+            for f in a.files:
+                path = Path(f)
+                data = path.read_bytes()
+                if ps1.sniff(data[:4000], len(data)) and not ps1.sniff_save(data):
+                    with ps1.Ps1Card(path, make_backups=False) as src:
+                        ed.copy_from(src, ["/"], overwrite=a.overwrite)
+                else:
+                    ed.import_save(ps1.load_save(data, path.name), overwrite=a.overwrite)
+        else:
+            for ref in a.saves:
+                s = _ps1_find(card, ref)
+                (ed.remove if a.cmd == "rm" else ed.restore)(s.path)
+        changes = list(ed.changes)
+    if changes:
+        print("\n".join(changes))
+    if card.last_backup:
+        print(t("cli.backup", path=card.last_backup))
     return 0
 
 
@@ -324,6 +444,14 @@ def main(argv: list[str] | None = None) -> int:
             return convert_main(argv[1:])
         if argv and argv[0] == "split":
             return split_main(argv[1:])
+        from .core import ps1
+
+        rest = [x for x in argv if x != "--no-backup" and not x.startswith("--lang")]
+        if rest and "--lang" in argv:
+            i = argv.index("--lang")
+            rest = [x for j, x in enumerate(argv) if j not in (i, i + 1) and x != "--no-backup"]
+        if rest and not rest[0].startswith("-") and ps1.is_ps1_image(rest[0]):
+            return ps1_main(rest[0], rest[1:], backups="--no-backup" not in argv)
         a = build_parser().parse_args(argv)
         with MemoryCard(a.card, make_backups=not a.no_backup) as card:
             return a.fn(card, a)

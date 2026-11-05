@@ -2,7 +2,7 @@
 
 [English](README.md) · [Português (Brasil)](README.pt-BR.md)
 
-A **PlayStation 2 memory card manager in your browser**. Open a card, see what is taking up space, move saves between cards, or work with a PSxMemCard Gen2 / SD2PSX card. It also handles OPL VMCs, PCSX2 cards and MemCard PRO2.
+A **PlayStation 2 and PlayStation 1 memory card manager in your browser**. Open a card, see what is taking up space, move saves between cards, or work with a PSxMemCard Gen2 / SD2PSX card. It also handles OPL VMCs, PCSX2 cards and MemCard PRO2, and PS1 cards from DexDrive, PSP/PS Vita and emulators.
 
 **[Open PSMemoryManager](https://gabrieltsants.github.io/PSMemoryManager/)** — nothing to install.
 
@@ -14,7 +14,7 @@ A **PlayStation 2 memory card manager in your browser**. Open a card, see what i
 
 ## What it does
 
-Browse and edit PS2 memory cards, import and export saves, convert between common card formats, and manage the cards and channels on a Gen2 SD card. Work on one card or keep two open side by side:
+Browse and edit PS2 and PS1 memory cards, import and export saves, convert between common card formats, and manage the cards and channels on a Gen2 SD card. Work on one card or keep two open side by side:
 
 ![Copying a save between two memory cards](docs/img/two-cards.gif)
 
@@ -53,6 +53,15 @@ It works on desktop and mobile, in light or dark mode. The interface is availabl
   - Split a card by game: one card per game, straight to the Gen2 SD card, as a `.zip` for the Gen2 SD card, or as a `.zip` for OPL (`VMC/SLUS_202.28_0.bin`, the names OPL itself uses).
   - Converting to OPL `.bin` suggests OPL's file name for the game (`SLUS_202.28_0.bin`).
   - Resize the open card (1–64 MB). Everything is kept, the change can be undone, and Save writes it back, also to the SD card.
+- **PS1 cards:**
+  - Opens raw images (`.mcd` Gen2/SD2PSX/MemCard PRO, `.mcr` ePSXe/DuckStation/Mednafen, `.srm` RetroArch…), DexDrive `.gme` (also files cut after the last used block), PSP/PS Vita `.vmp` and Connectix VGS `.vgs`/`.mem`. The format is detected from the content, not the extension.
+  - Shows each save with its animated icon, title (Japanese included), game code, region, blocks and where they are on the card, plus a map of the 15 blocks.
+  - Imports `.mcs`, `.psv` (PS3), `.psx`/`.mcb`/`.mcx`/`.pda` (Action Replay, GameShark, Xploder) and raw saves; exports `.mcs` or `.psv`.
+  - Deletes like the console does: a deleted save stays on the card until its blocks are reused, and can be restored.
+  - Copies saves between two PS1 cards, merges whole cards, converts between all the formats above (the 128 KB stay byte for byte the same) and splits a card by game (`MemoryCards/PS1/SLUS-00067/SLUS-00067-1.mcd`).
+  - `.vmp` and `.psv` files are **signed**, so the PSP, PS Vita and PS3 accept them. The signature was checked against files made by a real PSP and a real PS3.
+  - Cards with a non-standard directory, such as **FreePSXBoot** boot cards, open read-only so they keep working.
+  - On the Gen2 SD card, PS1 cards and channels can be opened, created (identical to the ones the Gen2 makes) and saved back.
 - **Game titles:** game folders on the SD card show the game's title under the code (`SLUS-20228` → *Silent Hill 2*) with a game icon, and saves show their game in the details. The list of about 12,700 games is loaded only when needed.
 - Checks file system integrity.
 - Creates new 1–64 MB cards, with or without ECC.
@@ -72,9 +81,7 @@ Shortcuts: `Ctrl+O` open · `Ctrl+S` save · `Ctrl+Z` undo · `Ctrl+E` extract �
 | 2 ✅ | Import saves (`.psu`, `.max`, `.cbs`, `.sps`, `.xps`, `.psv`), export `.psu`/`.max`, two cards side by side |
 | 3 ✅ | Gen2 SD mode: SD card folder with every card and channel, create cards/channels, edit `settings.ini`, channel names and `Game2Folder.ini` |
 | 4 ✅ | Conversion: OPL ↔ Gen2 ↔ PCSX2 ↔ MemCard PRO2 (with/without ECC), resize, split per game, merge, OPL VMC → SD game folder |
-| 5 | PS1 memory cards (`.mcr`, `.mcd`, `.gme`, `.vmp`, `.mcs`) |
-| later | Test `.cbs`, `.sps`/`.xps` and `.psv` import with real files |
-| later | Ready-made templates (OPL, FreeMcBoot, PS2BBL, FunTuna) for new cards, once licenses are checked |
+| 5 ✅ | PS1 memory cards: `.mcd`/`.mcr`/`.srm`, `.gme`, `.vmp`, `.vgs`; saves `.mcs`, `.psv`, `.psx`, raw; Gen2 SD PS1 cards |
 
 ## PS2 formats
 
@@ -86,6 +93,19 @@ Shortcuts: `Ctrl+O` open · `Ctrl+S` save · `Ctrl+Z` undo · `Ctrl+E` extract �
 | PCSX2 | `.ps2` | yes | 8,650,752 bytes |
 
 On the Gen2, cards live at `MemoryCards/PS2/<folder>/<folder>-<channel>.mcd`. Examples: `MemoryCards/PS2/BOOT/BootCard-1.mcd` and `MemoryCards/PS2/SLUS-20963/SLUS-20963-1.mcd`.
+
+## PS1 formats
+
+| Source | Extension | Size |
+|---|---|---|
+| PSxMemCard Gen2 / SD2PSX, MemCard PRO, DuckStation | `.mcd` (raw) | 131,072 bytes |
+| ePSXe, Mednafen, other emulators | `.mcr` (raw) | 131,072 bytes |
+| RetroArch | `.srm` (raw) | 131,072 bytes |
+| DexDrive | `.gme` | 134,976 bytes (often shorter) |
+| PSP / PS Vita (PS1 Classics) | `.vmp` (signed) | 131,200 bytes |
+| Connectix VGS | `.vgs` / `.mem` | 131,136 bytes |
+
+A PS1 card has 15 blocks of 8 KB. On the Gen2, PS1 cards live at `MemoryCards/PS1/<folder>/<folder>-<channel>.mcd`.
 
 ## Command line
 
@@ -106,6 +126,15 @@ psmm convert card.ps2 card.mcd --size 16        # PCSX2 -> Gen2, 16 MB
 psmm split all.mcd /media/SDCARD                # one card per game, in the SD card layout
 psmm Card1-1.mcd merge SLUS_202.28_0.bin other.ps2   # copy everything from other cards
 psmm Card1-1.mcd resize 16                      # change the size in place (with a backup)
+
+# PS1 (the format is detected from the content)
+psmm card.mcr ls                                # saves, blocks, deleted saves
+psmm card.mcr import save.mcs other.gme         # saves, or every save of other cards
+psmm card.mcr export 3 -o saves/ --format psv   # block number or save name; psv is signed
+psmm card.mcr rm BASLUS-00067DRAX00             # restorable: psmm card.mcr restore 1
+psmm new Card1-1.vmp --ps1                      # the extension picks the format
+psmm convert card.gme SCEVMC0.VMP               # DexDrive -> PSP/Vita
+psmm split card.mcr /media/SDCARD               # MemoryCards/PS1/<game>/
 ```
 
 In the terminal, every change backs up the card first:
@@ -125,7 +154,7 @@ python -m http.server -d _site 8000 # http://localhost:8000
 
 Layout:
 
-- `psmm/core/`: UI-independent core (formats, card, saves, SD card layout and INI files, conversion, fast ECC, backups, translations).
+- `psmm/core/`: UI-independent core (formats, card, saves, SD card layout and INI files, conversion, fast ECC, PS1 cards and saves, .vmp/.psv signing, backups, translations).
 - `psmm/web_api.py`: bridge used by the web page.
 - `psmm/cli.py`: command line.
 - `web/`: the page (HTML/CSS/JS, no build step). Pyodide runs in a Web Worker. UI strings are in `web/i18n.js`.
@@ -136,13 +165,17 @@ To add a language, add a column to `psmm/core/i18n.py` (core messages) and a blo
 
 ## Notes
 
-- `.psv` (PS3) saves can be imported but not exported; mymc++ does not implement writing them.
-- PS1 cards on the SD card are listed but open only from phase 5. Creating cards is limited to PS2 and arcade (COH). SoulCalibur II Conquest cards use their own format.
+- PS2 `.psv` (PS3) saves can be imported but not exported; mymc++ does not implement writing them. PS1 `.psv` saves are exported (signed).
+- Creating cards on the SD card works for PS2, PS1 and arcade (COH). SoulCalibur II Conquest cards use their own format.
+- PS1 game titles come from each save's own title; the game list (from PCSX2) only covers PS2 games.
+- PS1 saves are not renamed: the name holds the game code the game looks for.
 - `.max` export does not keep file dates (the format has no room for them), and its LZARI compression runs in pure Python. Typical game saves take a few seconds, while a multi-megabyte folder can take minutes. Prefer `.psu`.
 
 ## Credits and license
 
 Game titles come from PCSX2's [GameIndex.yaml](https://github.com/PCSX2/pcsx2/blob/master/bin/resources/GameIndex.yaml) (PCSX2 is GPL-3.0; its game data credits sonyindex, serialstation, psxdatacenter and redump). Only the code and title are kept, in `psmm/data/gamedb.json`, regenerated with `python tools/update_gamedb.py`.
 
+
+The PS1 formats follow nocash's PSX specifications and [MemcardRex](https://github.com/ShendoXT/memcardrex) (GPLv3); the `.vmp`/`.psv` signature follows [vita-mcr2vmp](https://github.com/dots-tb/vita-mcr2vmp) (GPLv3). The PS1 test files come from [save-file-converter](https://github.com/euan-forrester/save-file-converter) and [psx_mc_cli](https://github.com/G4Vi/psx_mc_cli) (see `tests/data/ps1/README.md`).
 
 GPLv3. Uses [mymc++](https://github.com/Adubbz/mymcplusplus) by Florian Märkl and others, based on Ross Ridge's mymc (also GPLv3). Inspired by [mcd_viewer](https://github.com/gamebitfunx/mcdviewer), made for the PSxMemCard Gen2.

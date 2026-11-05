@@ -26,6 +26,7 @@ from pathlib import Path
 from .core import saves as _saves
 from .core import sdcard as _sdcard
 from .core import convert as _convert
+from .core import ps1 as _ps1
 from .core.card import (
     CardError,
     Entry,
@@ -34,8 +35,9 @@ from .core.card import (
     NoSpaceError,
     norm_path,
 )
-from .core.formats import FormatError, Layout
+from .core.formats import FormatError, Layout, Platform, detect
 from .core.i18n import set_language as _set_language
+from .core.i18n import t as _t
 
 WORK = Path("/psmm")
 STAGING = WORK / "staging"  # JS writes files to add / saves to import here
@@ -45,9 +47,12 @@ HISTORY_LIMIT_BYTES = 192 * 1024 * 1024  # per slot
 SLOTS = ("A", "B")
 
 
+AnyCard = "MemoryCard | _ps1.Ps1Card"
+
+
 @dataclass
 class _Slot:
-    card: MemoryCard | None = None
+    card: MemoryCard | _ps1.Ps1Card | None = None
     history: list[bytes] = field(default_factory=list)
     version: int = 0  # incremented on every change
     saved_version: int = 0
@@ -66,11 +71,96 @@ def _slot(name: str) -> _Slot:
     return _slots[name]
 
 
-def _card(name: str) -> MemoryCard:
+def _card(name: str) -> MemoryCard | _ps1.Ps1Card:
     c = _slot(name).card
     if c is None:
         raise CardError("err.no_card")
     return c
+
+
+def _is_ps1(c) -> bool:
+    return isinstance(c, _ps1.Ps1Card)
+
+
+def _ps2(name: str) -> MemoryCard:
+    """The card in ``name``; PS2-only actions (folders, loose files) refuse PS1 cards."""
+    c = _card(name)
+    if _is_ps1(c):
+        raise CardError("ps1.not_for_ps1")
+    return c
+
+
+def _open_any(path: Path, make_backups: bool = False) -> MemoryCard | _ps1.Ps1Card:
+    """Opens a PS2 or PS1 card image (the format is detected from its content)."""
+    if detect(path).platform is Platform.PS1:
+        return _ps1.Ps1Card(path, make_backups=make_backups)
+    return MemoryCard(path, make_backups=make_backups)
+
+
+def _ps1_entry_dict(e: "_ps1.Ps1Entry") -> dict:
+    return {
+        "name": e.name,
+        "path": e.path,
+        "dir": False,
+        "size": e.size,
+        "title": e.title,
+        "created": None,
+        "modified": None,
+        "attrs": "",
+        "protected": False,
+        "ps1": True,
+        "files": 0,
+        "serial": e.serial,
+        "region": e.region_name(),
+        "regionCode": e.region,
+        "block": e.block,
+        "blocks": e.blocks,
+        "deleted": e.deleted,
+        "restorable": e.restorable,
+        "pocketstation": e.pocketstation,
+        "icon": e.icon.to_dict() if e.icon else None,
+        "problems": [_t(p, name=e.name, block=e.block) for p in e.problems],
+        "comment": e.comment,
+    }
+
+
+def _ps1_summary(name: str) -> dict:
+    s = _slot(name)
+    c = _card(name)
+    f = c.format
+    d = c.directory()
+    states = d.states
+    free = d.free_blocks()
+    return {
+        "slot": name,
+        "card": {
+            "name": c.path.name,
+            "describe": f.describe(),
+            "platform": "PS1",
+            "ecc": False,
+            "origin": f.origin.label,
+            "originId": f.origin.value,
+            "container": c.container,
+            "sizeMB": 0,
+            "fileSize": f.file_size,
+            "total": c.total_bytes(),
+            "free": len(free) * _ps1.BLOCK,
+            "used": c.total_bytes() - len(free) * _ps1.BLOCK,
+            "blocksTotal": _ps1.BLOCKS,
+            "blocksFree": len(free),
+            "blocksUsed": _ps1.BLOCKS - len(free),
+            "blockStates": states,
+            "sizeMismatch": f.size_mismatch,
+            "clusterSize": _ps1.BLOCK,
+            "game": _ps1.guess_game_id(c, c.path.name),
+            "readOnly": d.nonstandard,
+            "freepsxboot": d.freepsxboot,
+            "signed": c.signed,
+        },
+        "tree": [_ps1_entry_dict(e) for e in d.saves],
+        "canUndo": bool(s.history),
+        "dirty": s.version != s.saved_version,
+    }
 
 
 def _cards_dir(name: str) -> Path:
@@ -104,6 +194,8 @@ def _entry_dict(e: Entry) -> dict:
 def _summary(name: str) -> dict:
     s = _slot(name)
     c = _card(name)
+    if _is_ps1(c):
+        return _ps1_summary(name)
     i = c.info()
     f = i.format
     return {
@@ -123,6 +215,7 @@ def _summary(name: str) -> dict:
             "sizeMismatch": f.size_mismatch,
             "clusterSize": f.cluster_size,
             "game": _convert.guess_game_id(c, c.path.name),
+            "readOnly": False,
         },
         "tree": [_entry_dict(e) for e in c.tree()],
         "canUndo": bool(s.history),
@@ -208,7 +301,7 @@ def open_card(slot: str, name: str) -> str:
         path = _prepare_slot(slot) / _safe_filename(name)
         shutil.move(str(INCOMING), path)
         try:
-            _slot(slot).card = MemoryCard(path, make_backups=False)
+            _slot(slot).card = _open_any(path)
         except Exception:
             _close(slot)
             raise
@@ -217,11 +310,14 @@ def open_card(slot: str, name: str) -> str:
     return _result(run)
 
 
-def new_card(slot: str, name: str, size_mb: int, ecc: bool) -> str:
+def new_card(slot: str, name: str, size_mb: int, ecc: bool, platform: str = "PS2") -> str:
     def run():
         path = _prepare_slot(slot) / _safe_filename(name)
         s = _slot(slot)
-        s.card = MemoryCard.create(path, int(size_mb), ecc=bool(ecc))
+        if platform == "PS1":
+            s.card = _ps1.Ps1Card.create(path)
+        else:
+            s.card = MemoryCard.create(path, int(size_mb), ecc=bool(ecc))
         s.card.make_backups = False
         s.saved_version = -1  # a new card has not been saved yet
         return _summary(slot)
@@ -298,6 +394,8 @@ def staging_dir() -> str:
 
 def add_staged(slot: str, dest_dir: str, overwrite: bool = False) -> str:
     def apply(ed):
+        if isinstance(ed, _ps1.Ps1Editor):
+            raise CardError("ps1.not_for_ps1")
         items = _staged_files()
         if not items:
             raise CardError("err.nothing_to_add")
@@ -308,7 +406,7 @@ def add_staged(slot: str, dest_dir: str, overwrite: bool = False) -> str:
 
 
 def mkdir(slot: str, path: str) -> str:
-    return _result(_edit, slot, lambda ed: ed.mkdir(path))
+    return _result(lambda: (_ps2(slot), _edit(slot, lambda ed: ed.mkdir(path)))[1])
 
 
 def remove(slot: str, paths_json: str) -> str:
@@ -327,7 +425,19 @@ def remove(slot: str, paths_json: str) -> str:
 
 
 def rename(slot: str, path: str, new_name: str) -> str:
-    return _result(_edit, slot, lambda ed: ed.rename(path, new_name))
+    return _result(lambda: (_ps2(slot), _edit(slot, lambda ed: ed.rename(path, new_name)))[1])
+
+
+def restore(slot: str, paths_json: str) -> str:
+    """PS1: brings deleted saves back (while their blocks were not reused)."""
+
+    def apply(ed):
+        if not isinstance(ed, _ps1.Ps1Editor):
+            raise CardError("ps1.not_for_ps1")
+        for p in json.loads(paths_json):
+            ed.restore(p)
+
+    return _result(_edit, slot, apply)
 
 
 def copy_items(src_slot: str, paths_json: str, dst_slot: str, dest_dir: str = "/", overwrite: bool = False) -> str:
@@ -337,9 +447,14 @@ def copy_items(src_slot: str, paths_json: str, dst_slot: str, dest_dir: str = "/
         if src_slot == dst_slot:
             raise CardError("err.same_card")
         src = _card(src_slot)
+        dst = _card(dst_slot)
         paths = [norm_path(p) for p in json.loads(paths_json)]
         if not paths:
             raise CardError("err.nothing_selected")
+        if _is_ps1(src) != _is_ps1(dst):
+            raise CardError("ps1.platform_mismatch")
+        if _is_ps1(src):
+            return _edit(dst_slot, lambda ed: ed.copy_from(src, paths, bool(overwrite)))
         return _edit(dst_slot, lambda ed: ed.copy_from(src, paths, dest_dir, bool(overwrite)))
 
     return _result(run)
@@ -349,14 +464,40 @@ def copy_items(src_slot: str, paths_json: str, dst_slot: str, dest_dir: str = "/
 # saves
 
 
-def inspect_staged_saves() -> str:
-    """Parses the save files in ``STAGING`` (without importing them)."""
+_PS1_ONLY_EXT = (".mcs", ".ps1", ".psx", ".mcb", ".mcx", ".pda")
+_PS2_ONLY_EXT = (".psu", ".max", ".cbs", ".sps", ".xps")
+
+
+def _load_ps1_save(p: Path) -> "_ps1.Ps1SaveFile":
+    if p.suffix.lower() in _PS2_ONLY_EXT:
+        raise CardError("ps1.save_is_ps2", name=p.name)
+    return _ps1.load_save(p.read_bytes(), p.name)
+
+
+def _load_ps2_save(p: Path):
+    data = p.read_bytes()
+    ps1_psv = data.startswith(_ps1.PSV_MAGIC) and len(data) > 0x40 and data[0x3C] == 1
+    if ps1_psv or p.suffix.lower() in _PS1_ONLY_EXT:
+        raise CardError("save.is_ps1", name=p.name)
+    return _saves.load(data, p.name)
+
+
+def inspect_staged_saves(platform: str = "PS2") -> str:
+    """Parses the save files in ``STAGING`` (without importing them), for a PS2 or PS1 card."""
 
     def run():
         items = []
         for p in _staged_files():
+            if platform == "PS1":
+                try:
+                    sf = _load_ps1_save(p)
+                    items.append({"file": p.name, "ok": True, "name": sf.name, "title": sf.title, "files": sf.blocks,
+                                  "blocks": sf.blocks, "size": len(sf.data), "format": _ps1.format_name(sf.format)})
+                except CardError as e:
+                    items.append({"file": p.name, "ok": False, "error": str(e)})
+                continue
             try:
-                sf, fmt = _saves.load(p.read_bytes(), p.name)
+                sf, fmt = _load_ps2_save(p)
                 i = _saves.info(sf, fmt)
                 items.append({"file": p.name, "ok": True, "name": i.name, "title": i.title,
                               "files": i.files, "size": i.size, "format": i.format_name})
@@ -374,7 +515,10 @@ def import_staged_saves(slot: str, overwrite: bool = False) -> str:
         items = _staged_files()
         if not items:
             raise CardError("err.nothing_to_add")
-        loaded = [_saves.load(p.read_bytes(), p.name)[0] for p in items]
+        if isinstance(ed, _ps1.Ps1Editor):
+            loaded = [_load_ps1_save(p) for p in items]
+        else:
+            loaded = [_load_ps2_save(p)[0] for p in items]
         for sf in loaded:
             ed.import_save(sf, overwrite=bool(overwrite))
 
@@ -392,7 +536,12 @@ def export_saves(slot: str, paths_json: str, fmt: str = "psu") -> str:
         files = []
         for p in paths:
             sf = c.export_save(p)
-            files.append((_saves.export_filename(sf, fmt), _saves.dump(sf, fmt)))
+            if _is_ps1(c):
+                if fmt not in _ps1.EXPORT_FORMATS:
+                    raise CardError("save.bad_format", format=fmt)
+                files.append((_ps1.export_filename(sf, fmt), _ps1.dump_save(sf, fmt)))
+            else:
+                files.append((_saves.export_filename(sf, fmt), _saves.dump(sf, fmt)))
         if len(files) == 1:
             name, data = files[0]
             kind = "file"
@@ -422,7 +571,7 @@ def export(slot: str, paths_json: str) -> str:
     """Writes the raw export to ``EXPORT``. A single file is exported as-is; anything else becomes a .zip."""
 
     def run():
-        c = _card(slot)
+        c = _ps2(slot)
         paths = [norm_path(p) for p in json.loads(paths_json)]
         if not paths:
             raise CardError("err.nothing_selected")
@@ -517,7 +666,7 @@ def sd_write_game2folder(rows_json: str) -> str:
     return _result(run)
 
 
-_SD_CREATABLE = ("PS2", "COH")  # PS1 cards come in phase 5; Conquest cards use their own format
+_SD_CREATABLE = ("PS2", "PS1", "COH")  # Conquest (SC2) cards use their own format
 
 
 def sd_plan_card(variant: str, game_id: str = "") -> str:
@@ -550,10 +699,13 @@ def sd_plan_channel(variant: str, folder: str) -> str:
     return _result(run)
 
 
-def blank_card(size_mb: int, ecc: bool = False) -> str:
-    """Formats an empty PS2 card into ``EXPORT`` (the page writes it to the SD)."""
+def blank_card(size_mb: int, ecc: bool = False, platform: str = "PS2") -> str:
+    """Formats an empty card into ``EXPORT`` (the page writes it to the SD)."""
 
     def run():
+        if platform == "PS1":
+            EXPORT.write_bytes(_ps1.blank_card())
+            return {"path": str(EXPORT), "name": "blank.mcd", "size": _ps1.CARD_SIZE}
         tmp = WORK / "blank.mcd"
         tmp.unlink(missing_ok=True)
         MemoryCard.create(tmp, int(size_mb), ecc=bool(ecc)).close()
@@ -567,14 +719,14 @@ def blank_card(size_mb: int, ecc: bool = False) -> str:
 # Whole cards: import (OPL VMCs, other cards), convert, split by game
 
 
-def _staged_card(name: str) -> MemoryCard:
+def _staged_card(name: str) -> MemoryCard | _ps1.Ps1Card:
     path = STAGING / os.path.basename(name)
     if not path.is_file():
         raise CardError("err.not_found", path=name)
-    return MemoryCard(path, make_backups=False)
+    return _open_any(path)
 
 
-def _zip_cards(items: list[tuple[str, Path]], layout: str = "gen2") -> bytes:
+def _zip_cards(items: list[tuple[str, Path]], layout: str = "gen2", variant: str = "PS2") -> bytes:
     """(game, card file) pairs -> .zip ready to extract.
 
     gen2: Gen2 SD card layout, MemoryCards/PS2/<game>/<game>-N.mcd (N = channel)
@@ -589,7 +741,7 @@ def _zip_cards(items: list[tuple[str, Path]], layout: str = "gen2") -> bytes:
             if layout == "opl":
                 z.write(path, "VMC/" + _convert.opl_vmc_name(game, n))
             else:
-                z.write(path, _sdcard.channel_path("PS2", game, n + 1))
+                z.write(path, _sdcard.channel_path(variant, game, n + 1))
     return buf.getvalue()
 
 
@@ -601,13 +753,23 @@ def inspect_staged_cards() -> str:
         for p in _staged_files():
             try:
                 with _staged_card(p.name) as c:
+                    if _is_ps1(c):
+                        groups = _ps1.group_by_game(c)[0]
+                        cards.append({
+                            "file": p.name, "ok": True, "platform": "PS1", "describe": c.format.describe(),
+                            "ecc": False, "sizeMB": 0, "size": _ps1.CARD_SIZE,
+                            "game": _ps1.guess_game_id(c, p.name), "games": list(groups),
+                            "entries": [{"name": e.name, "title": e.title, "serial": e.serial} for e in c.directory().live()],
+                            "used": c.total_bytes() - c.free_bytes(), "readOnly": c.read_only,
+                        })
+                        continue
                     groups, others = _convert.group_by_game(c)
                     saves = [
                         {"name": e.name, "title": e.title, "serial": e.game_id.serial if e.game_id else None}
                         for e in c.list_dir("/")
                     ]
                     cards.append({
-                        "file": p.name, "ok": True, "describe": c.format.describe(),
+                        "file": p.name, "ok": True, "platform": "PS2", "size": c.format.nominal_size, "describe": c.format.describe(),
                         "ecc": c.format.layout is Layout.ECC, "sizeMB": c.format.nominal_mb,
                         "game": _convert.guess_game_id(c, p.name), "games": [g.game for g in groups],
                         "entries": saves, "used": c.total_bytes() - c.free_bytes(),
@@ -625,7 +787,12 @@ def import_staged_cards(slot: str, files_json: str, overwrite: bool = False) -> 
     def apply(ed):
         for name in json.loads(files_json):
             with _staged_card(name) as src:
-                ed.copy_from(src, ["/"], "/", overwrite=bool(overwrite))
+                if _is_ps1(src) != isinstance(ed, _ps1.Ps1Editor):
+                    raise CardError("ps1.platform_mismatch")
+                if _is_ps1(src):
+                    ed.copy_from(src, ["/"], overwrite=bool(overwrite))
+                else:
+                    ed.copy_from(src, ["/"], "/", overwrite=bool(overwrite))
 
     return _result(_edit, slot, apply)
 
@@ -635,7 +802,10 @@ def prepare_staged_card(name: str) -> str:
 
     def run():
         with _staged_card(name) as src:
-            _convert.convert(src, EXPORT, ecc=False)
+            if _is_ps1(src):
+                src.convert(EXPORT, "gen2")
+            else:
+                _convert.convert(src, EXPORT, ecc=False)
         return {"path": str(EXPORT), "size": EXPORT.stat().st_size}
 
     return _result(run)
@@ -645,7 +815,7 @@ def staged_cards_zip(items_json: str, layout: str = "gen2") -> str:
     """``[{"file", "game"}]`` -> .zip for the Gen2 SD card or for OPL (``layout``), in ``EXPORT``."""
 
     def run():
-        items = []
+        items = {"PS2": [], "PS1": []}
         out_dir = WORK / "zipcards"
         shutil.rmtree(out_dir, ignore_errors=True)
         out_dir.mkdir(parents=True)
@@ -655,9 +825,15 @@ def staged_cards_zip(items_json: str, layout: str = "gen2") -> str:
                 raise CardError("conv.no_game_id", name=it["file"])
             dest = out_dir / f"{i}.mcd"
             with _staged_card(it["file"]) as src:
+                if _is_ps1(src):
+                    src.convert(dest, "gen2")
+                    items["PS1"].append((game, dest))
+                    continue
                 _convert.convert(src, dest, ecc=False)
-            items.append((game, dest))
-        EXPORT.write_bytes(_zip_cards(items, layout))
+            items["PS2"].append((game, dest))
+        if layout == "opl" and items["PS1"]:
+            raise CardError("conv.opl_ps2_only")
+        EXPORT.write_bytes(_zip_many(items, layout))
         shutil.rmtree(out_dir, ignore_errors=True)
         name = "OPL-VMC.zip" if layout == "opl" else "Gen2-MemoryCards.zip"
         return {"path": str(EXPORT), "name": name, "kind": "zip", "size": EXPORT.stat().st_size}
@@ -665,7 +841,22 @@ def staged_cards_zip(items_json: str, layout: str = "gen2") -> str:
     return _result(run)
 
 
-def sd_plan_import(game: str, size: int) -> str:
+def _zip_many(items: dict[str, list[tuple[str, Path]]], layout: str) -> bytes:
+    """PS2 and PS1 cards in one .zip (each under its own MemoryCards/<variant>/)."""
+    if not items["PS1"]:
+        return _zip_cards(items["PS2"], layout)
+    if not items["PS2"]:
+        return _zip_cards(items["PS1"], layout, "PS1")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for variant in ("PS2", "PS1"):
+            with zipfile.ZipFile(io.BytesIO(_zip_cards(items[variant], layout, variant))) as part:
+                for info in part.infolist():
+                    z.writestr(info, part.read(info))
+    return buf.getvalue()
+
+
+def sd_plan_import(game: str, size: int, variant: str = "PS2") -> str:
     """Where a card for ``game`` goes on the SD: a new game folder, or the next channel if it exists.
 
     The planned file is added to the listing right away, so several cards for
@@ -677,16 +868,16 @@ def sd_plan_import(game: str, size: int) -> str:
         if not gid:
             raise CardError("sd.bad_game_id", game=game)
         layout = _sd_layout()
-        v = layout.variant("PS2")
+        v = layout.variant(variant)
         existing = v.find(gid) if v else None
         if existing:
             try:
-                plan = _sdcard.plan_new_channel(layout, "PS2", existing.folder)
+                plan = _sdcard.plan_new_channel(layout, variant, existing.folder)
             except ValueError as e:
                 raise CardError("sd.no_channels", max=_sdcard.MAX_CHANNELS) from e
             plan["existing"] = True
         else:
-            plan = _sdcard.plan_new_card(layout, "PS2", gid)
+            plan = _sdcard.plan_new_card(layout, variant, gid)
             plan["existing"] = False
         _sd_files.append({"path": plan["path"], "size": int(size)})
         return plan
@@ -698,9 +889,15 @@ def convert_card(slot: str, target: str, size_mb: int = 0) -> str:
     """The card in ``slot`` converted to ``target`` (gen2/opl/pcsx2/mcp2) and size, in ``EXPORT``."""
 
     def run():
+        c = _card(slot)
+        if _is_ps1(c):
+            if target not in _ps1.TARGETS:
+                raise CardError("save.bad_format", format=target)
+            c.convert(EXPORT, target)
+            return {"path": str(EXPORT), "name": _ps1.output_name(c.path.name, target),
+                    "kind": "file", "size": EXPORT.stat().st_size}
         if target not in _convert.TARGETS:
             raise CardError("save.bad_format", format=target)
-        c = _card(slot)
         _convert.convert(c, EXPORT, ecc=_convert.TARGETS[target][1], size_mb=int(size_mb) or None)
         return {"path": str(EXPORT), "name": _convert.output_name(c.path.name, target),
                 "kind": "file", "size": EXPORT.stat().st_size}
@@ -715,10 +912,17 @@ def split_card(slot: str, size_mb: int, include_others: bool, mode: str) -> str:
     def run():
         out_dir = WORK / "split"
         shutil.rmtree(out_dir, ignore_errors=True)
-        cards = _convert.split_by_game(_card(slot), out_dir, size_mb=int(size_mb), include_others=bool(include_others))
+        card = _card(slot)
+        if _is_ps1(card):
+            if mode == "zip-opl":
+                raise CardError("conv.opl_ps2_only")
+            cards = _ps1.split_by_game(card, out_dir, include_others=bool(include_others))
+        else:
+            cards = _convert.split_by_game(card, out_dir, size_mb=int(size_mb), include_others=bool(include_others))
+        variant = "PS1" if _is_ps1(card) else "PS2"
         if mode in ("zip", "zip-opl"):
             layout = "opl" if mode == "zip-opl" else "gen2"
-            EXPORT.write_bytes(_zip_cards([(c["game"], Path(c["path"])) for c in cards], layout))
+            EXPORT.write_bytes(_zip_cards([(c["game"], Path(c["path"])) for c in cards], layout, variant))
             shutil.rmtree(out_dir, ignore_errors=True)
             name = f"{_card(slot).path.stem}-{'OPL-VMC' if layout == 'opl' else 'Gen2'}.zip"
             return {"path": str(EXPORT), "name": name, "kind": "zip",
@@ -733,7 +937,7 @@ def resize_card(slot: str, size_mb: int) -> str:
 
     def run():
         s = _slot(slot)
-        c = _card(slot)
+        c = _ps2(slot)
         size_mb_i = int(size_mb)
         if size_mb_i == c.format.nominal_mb:
             raise CardError("conv.same_size", size=size_mb_i)
@@ -752,7 +956,12 @@ def resize_card(slot: str, size_mb: int) -> str:
 
 def split_preview(slot: str) -> str:
     def run():
-        groups, others = _convert.group_by_game(_card(slot))
+        c = _card(slot)
+        if _is_ps1(c):
+            groups, others = _ps1.group_by_game(c)
+            return {"games": [{"game": g, "titles": [s.title or s.name for s in v]} for g, v in groups.items()],
+                    "others": [s.name for s in others]}
+        groups, others = _convert.group_by_game(c)
         return {"games": [{"game": g.game, "titles": g.titles} for g in groups],
                 "others": [p.rsplit("/", 1)[1] for p in others]}
 

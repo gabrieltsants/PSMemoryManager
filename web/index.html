@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PSMemoryManager</title>
-  <meta name="description" content="PS2 memory card manager in the browser: PSxMemCard Gen2, OPL VMC, PCSX2 and MemCard PRO2.">
+  <meta name="description" content="PS2 and PS1 memory card manager in the browser: PSxMemCard Gen2, OPL VMC, PCSX2, MemCard PRO2, DexDrive, PSP/Vita and emulators.">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <meta name="psmm-build" content="__BUILD__">
   <link rel="stylesheet" href="style.css?v=__BUILD__">
@@ -110,10 +110,10 @@
 
   <dialog id="dialog"><form method="dialog" id="dialogForm"></form></dialog>
 
-  <input type="file" id="pickCard" accept=".mcd,.bin,.vmc,.ps2,.mc2" hidden>
+  <input type="file" id="pickCard" accept=".mcd,.bin,.vmc,.ps2,.mc2,.mcr,.gme,.vmp,.vgs,.mem,.srm,.mc,.ps,.psm,.ddf,.mci,.vm1" hidden>
   <input type="file" id="pickFiles" multiple hidden>
   <input type="file" id="pickFolder" webkitdirectory hidden>
-  <input type="file" id="pickSaves" accept=".psu,.max,.cbs,.sps,.xps,.psv,.bin,.mcd,.vmc,.ps2,.mc2" multiple hidden>
+  <input type="file" id="pickSaves" multiple hidden>
   <input type="file" id="pickSdDir" webkitdirectory hidden>
 
   <template id="paneTpl">
@@ -131,6 +131,7 @@
         <div class="capacity">
           <div class="capacity-text"><span class="used"></span><span class="free muted"></span></div>
           <div class="bar"><div class="bar-fill"></div></div>
+          <div class="blockmap" hidden></div>
         </div>
       </div>
       <div class="tree-wrap">

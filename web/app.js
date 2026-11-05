@@ -47,6 +47,7 @@ const ICONS = {
   sun: `<circle ${S} cx="12" cy="12" r="4"/><path ${S} d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>`,
   moon: `<path ${S} d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>`,
   auto: `<circle ${S} cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>`,
+  warn: `<path ${S} d="M12 3.5 2.5 20h19z"/><path ${S} d="M12 10v4.5"/><circle cx="12" cy="17.2" r="1.1" fill="currentColor"/>`,
 };
 const svg = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>`;
 function paintIcons(root = document) {
@@ -72,17 +73,24 @@ function human(n) {
 const fmtDate = (iso) => (iso ? new Intl.DateTimeFormat(locale(), { dateStyle: "short", timeStyle: "short" }).format(new Date(iso)) : "—");
 const fmtInt = (n) => new Intl.NumberFormat(locale()).format(n);
 
-const CARD_EXT = [".mcd", ".bin", ".vmc", ".ps2", ".mc2"];
-const SAVE_EXT = [".psu", ".max", ".cbs", ".sps", ".xps", ".psv"];
+const CARD_EXT = [".mcd", ".bin", ".vmc", ".ps2", ".mc2", ".mcr", ".gme", ".vmp", ".vgs", ".mem", ".srm", ".mc", ".ps", ".psm", ".ddf", ".mci", ".vm1"];
+const SAVE_EXT = [".psu", ".max", ".cbs", ".sps", ".xps", ".psv", ".mcs", ".ps1", ".psx", ".mcb", ".mcx", ".pda"];
 const CARD_SIZES = new Set();
 for (const mb of [1, 2, 4, 8, 16, 32, 64, 128]) {
   const raw = mb * 1024 * 1024;
   CARD_SIZES.add(raw);
   CARD_SIZES.add(raw / 512 * 528);
 }
-CARD_SIZES.add(128 * 1024); // PS1 (the core reports it is not supported yet)
+const PS1_SIZE = 128 * 1024;
+// PS1: raw, DexDrive (.gme), Connectix VGS, PSP/Vita (.vmp)
+for (const extra of [0, 3904, 64, 128]) CARD_SIZES.add(PS1_SIZE + extra);
 const hasExt = (name, list) => list.some((e) => name.toLowerCase().endsWith(e));
-const looksLikeCard = (file) => hasExt(file.name, CARD_EXT) && CARD_SIZES.has(file.size);
+// A card extension at 128 KB or more is a card (whatever its exact size: the core
+// reports odd sizes); smaller files are saves (a PS1 save has at most 120 KB).
+// DexDrive files are often cut after the last used block, so any .gme counts.
+const isCardLike = (name, size) => hasExt(name, CARD_EXT) && (size >= PS1_SIZE || hasExt(name, [".gme"]));
+const looksLikeCard = (file) => isCardLike(file.name, file.size);
+const isPs1 = (p) => p?.summary?.card.platform === "PS1";
 
 function download(name, data, type = "application/octet-stream") {
   const url = URL.createObjectURL(new Blob([data], { type }));
@@ -110,6 +118,61 @@ const storage = {
   get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* no storage */ } },
 };
+
+// ---------------------------------------------------------------------------
+// PS1 save icons: 16x16, 16 colours, 1-3 frames (animated like on the console)
+
+const iconCache = new Map();
+function ps1IconUrl(icon, frame) {
+  const key = `${frame}:${icon.pal.join()}:${icon.px.slice(frame * 256, frame * 256 + 256)}`;
+  let url = iconCache.get(key);
+  if (url) return url;
+  const c = document.createElement("canvas");
+  c.width = c.height = 16;
+  const ctx = c.getContext("2d");
+  const img = ctx.createImageData(16, 16);
+  const pal = icon.pal.map((h) => (h ? [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) : null));
+  for (let i = 0; i < 256; i++) {
+    const byte = parseInt(icon.px.substr((frame * 128 + (i >> 1)) * 2, 2), 16);
+    const col = pal[i & 1 ? byte >> 4 : byte & 15];
+    if (col) img.data.set([col[0], col[1], col[2], 255], i * 4);
+  }
+  ctx.putImageData(img, 0, 0);
+  url = c.toDataURL();
+  if (iconCache.size > 600) iconCache.clear();
+  iconCache.set(key, url);
+  return url;
+}
+
+function ps1IconHtml(e, cls = "ps1-icon") {
+  if (!e.icon || !e.icon.px) return `<span class="${cls} none">${svg("save")}</span>`;
+  const frames = Array.from({ length: e.icon.n }, (_, i) => ps1IconUrl(e.icon, i));
+  return `<img class="${cls}" alt="" draggable="false" src="${frames[0]}"${frames.length > 1 ? ` data-frames="${frames.join(" ")}"` : ""}>`;
+}
+
+let iconTick = 0;
+const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+setInterval(() => {
+  if (reduceMotion?.matches || document.hidden) return;
+  iconTick++;
+  document.querySelectorAll("img[data-frames]").forEach((img) => {
+    const f = img.dataset.frames.split(" ");
+    img.src = f[iconTick % f.length];
+  });
+}, 280);
+
+// [7, 8, 10, 11, 12] -> "7–8, 10–12"
+function blockRanges(blocks) {
+  const out = [];
+  for (let i = 0; i < blocks.length; i++) {
+    let j = i;
+    while (j + 1 < blocks.length && blocks[j + 1] === blocks[j] + 1) j++;
+    out.push(j > i ? `${blocks[i]}–${blocks[j]}` : String(blocks[i]));
+    i = j;
+  }
+  return out.join(", ");
+}
+const blocksLabel = (n) => (n === 1 ? t("unit.block") : t("unit.blocks", { n }));
 
 // ---------------------------------------------------------------------------
 // Worker (Pyodide)
@@ -266,7 +329,7 @@ async function run(statusKey, params, fn) {
 
 function sortedChildren(list) {
   const { key, desc } = state.sort;
-  const val = (e) => key === "size" ? e.size : key === "modified" ? (e.modified || "") : key === "title" ? (e.title || "").toLowerCase() : e.name.toLowerCase();
+  const val = (e) => key === "size" ? e.size : key === "modified" ? (e.ps1 ? e.block : e.modified || "") : key === "title" ? (e.title || "").toLowerCase() : e.name.toLowerCase();
   return [...list].sort((a, b) => {
     if (a.dir !== b.dir) return a.dir ? -1 : 1;
     const x = val(a), y = val(b);
@@ -321,12 +384,19 @@ function renderPane(p) {
   const close = $(".close-card", p.el);
   close.title = t("pane.close");
   close.setAttribute("aria-label", t("pane.close"));
-  const chips = [
+  const ps1 = c.platform === "PS1";
+  const chips = ps1 ? [
+    `<span class="chip accent">PS1</span>`,
+    `<span class="chip">${esc(t("chip.blocks"))}</span>`,
+    `<span class="chip">${esc(c.origin)}</span>`,
+  ] : [
     `<span class="chip accent">${esc(c.platform)}</span>`,
     `<span class="chip">${c.sizeMB} MB</span>`,
     `<span class="chip">${esc(t(c.ecc ? "chip.ecc" : "chip.noecc"))}</span>`,
     `<span class="chip">${esc(c.origin)}</span>`,
   ];
+  if (ps1 && c.container === "vmp") chips.push(c.signed === false ? `<span class="chip warn">${esc(t("chip.unsigned"))}</span>` : `<span class="chip">${esc(t("chip.signed"))}</span>`);
+  if (c.readOnly) chips.push(`<span class="chip warn" title="${esc(t("chip.readOnlyTip"))}">${esc(t(c.freepsxboot ? "chip.freepsxboot" : "chip.readOnly"))}</span>`);
   if (c.sizeMismatch) chips.push(`<span class="chip warn">${esc(t("chip.mismatch"))}</span>`);
   if (p.sdPath) {
     const parts = p.sdPath.split("/"); // MemoryCards/PS2/BOOT/BootCard-1.mcd
@@ -337,8 +407,18 @@ function renderPane(p) {
   const fill = $(".bar-fill", p.el);
   fill.style.width = pct.toFixed(1) + "%";
   fill.className = "bar-fill" + (pct > 95 ? " full" : pct > 80 ? " warn" : "");
-  $(".used", p.el).textContent = t("card.used", { used: human(c.used) });
-  $(".free", p.el).textContent = t("card.free", { free: human(c.free), total: human(c.total) });
+  $(".bar", p.el).hidden = ps1;
+  $(".blockmap", p.el).hidden = !ps1;
+  if (ps1) {
+    $(".used", p.el).textContent = t("card.blocksUsed", { used: c.blocksUsed, total: c.blocksTotal });
+    $(".free", p.el).textContent = t("card.blocksFree", { free: c.blocksFree });
+    renderBlockMap(p);
+  } else {
+    $(".used", p.el).textContent = t("card.used", { used: human(c.used) });
+    $(".free", p.el).textContent = t("card.free", { free: human(c.free), total: human(c.total) });
+  }
+  $(".tree-head .col-size", p.el).textContent = t(ps1 ? "col.blocks" : "col.size");
+  $(".tree-head .col-date", p.el).textContent = t(ps1 ? "col.where" : "col.modified");
 
   p.el.querySelectorAll(".tree-head button").forEach((b) => {
     b.classList.toggle("sorted", b.dataset.sort === state.sort.key);
@@ -347,9 +427,54 @@ function renderPane(p) {
   renderTree(p);
 }
 
+// PS1: the 15 blocks of the card, coloured by save (click selects the save)
+function renderBlockMap(p) {
+  const owner = new Map();
+  const live = p.summary.tree.filter((e) => !e.deleted);
+  for (const e of p.summary.tree) for (const b of e.blocks) if (!e.deleted || !owner.has(b)) owner.set(b, e);
+  for (const e of live) for (const b of e.blocks) owner.set(b, e);
+  const cells = [];
+  for (let b = 1; b <= 15; b++) {
+    const e = owner.get(b);
+    const state = p.summary.card.blockStates[b - 1];
+    // in use but no save reaches it (FreePSXBoot, damaged directory): not free
+    const odd = !e && state !== 0xA0 && !(state >= 0xA1 && state <= 0xA3);
+    const free = !e || e.deleted;
+    const hue = e && !e.deleted ? live.indexOf(e) % 6 : 0;
+    const tip = odd ? t("block.odd", { n: b }) : !e ? t("block.free", { n: b }) : e.deleted ? t("block.deleted", { n: b, name: e.title || e.name }) : t("block.used", { n: b, name: e.title || e.name });
+    const sel = e && p.selected.has(e.path) ? " sel" : "";
+    const kind = odd ? " odd" : free ? (e ? " del" : " free") : ` h${hue}`;
+    cells.push(`<span class="blk${kind}${sel}" title="${esc(tip)}"${e ? ` data-path="${esc(e.path)}"` : ""}>${b}</span>`);
+  }
+  $(".blockmap", p.el).innerHTML = cells.join("");
+}
+
+function renderPs1Row(p, e) {
+  const cls = ["row", "ps1row"];
+  if (p.selected.has(e.path)) cls.push("selected");
+  if (p.focus === e.path) cls.push("focused");
+  if (e.deleted) cls.push("deleted");
+  const tags =
+    (e.deleted ? `<span class="tag del" title="${esc(t(e.restorable ? "tree.deletedTip" : "tree.goneTip"))}">${esc(t("tree.deleted"))}</span>` : "") +
+    (e.pocketstation ? `<span class="tag">PocketStation</span>` : "") +
+    (e.problems.length && !e.deleted ? `<span class="lock" title="${esc(t("tree.problems"))}">${svg("warn")}</span>` : "");
+  return `<div class="${cls.join(" ")}" role="treeitem" draggable="${!e.deleted}" aria-level="1" aria-selected="${p.selected.has(e.path)}" data-path="${esc(e.path)}">` +
+    `<div class="c-name" style="padding-left:8px"><span class="ricon ps1">${ps1IconHtml(e)}</span>` +
+    `<span class="nm" title="${esc(e.name)}">${esc(e.name)}</span>${tags}</div>` +
+    `<div class="c-title" title="${esc(e.title)}">${esc(e.title)}</div>` +
+    `<div class="c-size">${esc(blocksLabel(e.blocks.length))}</div>` +
+    `<div class="c-date">${esc(blockRanges(e.blocks))}</div></div>`;
+}
+
 function renderTree(p) {
   const rows = [];
   p.visible = [];
+  if (isPs1(p)) {
+    for (const e of sortedChildren(p.summary.tree)) { p.visible.push(e); rows.push(renderPs1Row(p, e)); }
+    p.tree.innerHTML = rows.length ? rows.join("") : `<div class="tree-empty">${esc(t("tree.emptyPs1"))}</div>`;
+    renderBlockMap(p);
+    return;
+  }
   const walk = (list, depth) => {
     for (const e of sortedChildren(list)) {
       p.visible.push(e);
@@ -384,10 +509,54 @@ function dl(rows) {
   return `<dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
 }
 
+function renderPs1Details(p, el, sel) {
+  const c = p.summary.card;
+  const tree = p.summary.tree;
+  if (sel.length === 0) {
+    const deleted = tree.filter((e) => e.deleted);
+    const rows = [
+      [t("det.ps1.saves"), String(tree.length - deleted.length)],
+      [t("det.ps1.blocks"), t("det.ps1.blocksValue", { used: c.blocksUsed, free: c.blocksFree })],
+    ];
+    if (deleted.length) rows.push([t("det.ps1.deleted"), t("det.ps1.deletedValue", { n: deleted.length, r: deleted.filter((e) => e.restorable).length })]);
+    if (c.container === "vmp") rows.push([t("det.ps1.signature"), t(c.signed === false ? "det.ps1.sigBad" : "det.ps1.sigOk")]);
+    rows.push([t("det.file"), human(c.fileSize)]);
+    el.innerHTML = `<h2>${esc(c.name)}</h2><div class="path">${esc(c.describe)}</div>` + dl(rows) +
+      (c.readOnly ? `<div class="warnbox">${esc(t(c.freepsxboot ? "det.ps1.freepsxboot" : "det.ps1.readOnly"))}</div>` : "") +
+      `<p class="hint">${esc(t("det.ps1.hint"))}</p>`;
+    return;
+  }
+  if (sel.length > 1) {
+    const blocks = sel.reduce((a, e) => a + e.blocks.length, 0);
+    el.innerHTML = `<h2>${esc(t("det.ps1.multi", { n: sel.length }))}</h2>` + dl([[t("det.total"), t("det.ps1.multiBlocks", { n: blocks })]]);
+    return;
+  }
+  const e = sel[0];
+  const rows = [];
+  if (e.serial) {
+    const game = gameName(e.serial);
+    if (game) rows.push([t("det.game"), game]);
+    rows.push([t("det.serial"), e.serial]);
+    if (e.region) rows.push([t("det.region"), e.region]);
+  }
+  rows.push([t("det.ps1.saveName"), e.name]);
+  rows.push([t("det.type"), t(e.pocketstation ? "det.ps1.pocket" : "det.type.ps1save")]);
+  rows.push([t("det.size"), `${blocksLabel(e.blocks.length)} (${human(e.size)})`]);
+  rows.push([t("det.ps1.blockList"), blockRanges(e.blocks)]);
+  if (e.icon) rows.push([t("det.ps1.iconFrames"), t("det.ps1.iconValue", { n: e.icon.n })]);
+  rows.push([t("det.ps1.status"), t(!e.deleted ? "det.ps1.statusLive" : e.restorable ? "det.ps1.statusDeleted" : "det.ps1.statusGone")]);
+  if (e.comment) rows.push([t("det.ps1.comment"), e.comment]);
+  el.innerHTML =
+    `<div class="ps1-head">${ps1IconHtml(e, "ps1-big")}<h2>${esc(e.title || e.name)}</h2></div>` + dl(rows) +
+    (e.problems.length ? `<div class="warnbox">${e.problems.map(esc).join("<br>")}</div>` : "") +
+    (e.deleted && e.restorable && !c.readOnly ? `<div class="det-actions"><button class="btn" data-act="restore">${esc(t("act.restore"))}</button></div>` : "");
+}
+
 function renderDetails(p) {
   const el = $("#details");
   const sel = [...p.selected].map((x) => p.byPath.get(x)).filter(Boolean);
   const c = p.summary.card;
+  if (c.platform === "PS1") return renderPs1Details(p, el, sel);
   if (sel.length === 0) {
     el.innerHTML =
       `<h2>${esc(c.name)}</h2><div class="path">${esc(c.describe)}</div>` +
@@ -425,26 +594,35 @@ function renderDetails(p) {
     (e.protected ? `<div class="warnbox">${esc(t("det.protectedWarn"))}</div>` : "");
 }
 
-// selected root-level folders that only contain files (= exportable saves)
+// selected root-level folders that only contain files (= exportable saves); PS1: the selected saves not deleted
 function selectedSaves(p) {
   const sel = [...p.selected].map((x) => p.byPath.get(x)).filter(Boolean);
+  if (isPs1(p)) return sel.length && sel.every((e) => !e.deleted) ? sel.map((e) => e.path) : [];
   if (!sel.length || !sel.every((e) => e.dir && e.flat && p.parentOf.get(e.path) === "/")) return [];
   return sel.map((e) => e.path);
 }
 
-const canCopy = (p) => state.dual && !!p.summary && !!panes[otherSlot(p.slot)].summary && p.selected.size > 0;
+const canCopy = (p) => state.dual && !!p.summary && !!panes[otherSlot(p.slot)].summary && p.selected.size > 0 &&
+  !panes[otherSlot(p.slot)].summary.card.readOnly;
+// PS1: selected deleted saves that can be brought back
+const selectedRestorable = (p) => (isPs1(p) && !p.summary.card.readOnly
+  ? [...p.selected].map((x) => p.byPath.get(x)).filter((e) => e && e.deleted && e.restorable).map((e) => e.path) : []);
 
 function updateActions() {
   const p = P();
   const has = !!p.summary;
   const sel = p.selected.size;
+  const ps1 = isPs1(p);
+  const ro = has && p.summary.card.readOnly;
   const en = {
     open: state.ready, new: state.ready,
     save: has && p.summary.dirty, saveAs: has, undo: has && p.summary.canUndo,
-    addFiles: has, addFolder: has, mkdir: has,
-    extract: has, rename: has && sel === 1, delete: has && sel > 0, check: has,
-    importSave: state.ready, exportSave: has && selectedSaves(p).length > 0,
-    dual: state.ready, copy: canCopy(p), sd: state.ready, convert: has, split: has, resize: has,
+    addFiles: has && !ps1, addFolder: has && !ps1, mkdir: has && !ps1,
+    extract: has && !ps1, rename: has && !ps1 && sel === 1,
+    delete: has && sel > 0 && !ro && (!ps1 || selectedSaves(p).length > 0), check: has,
+    importSave: state.ready && !ro, exportSave: has && selectedSaves(p).length > 0,
+    dual: state.ready, copy: canCopy(p), sd: state.ready, convert: has, split: has && !ro, resize: has && !ps1,
+    restore: has && selectedRestorable(p).length > 0,
   };
   document.querySelectorAll("[data-act]").forEach((b) => {
     const k = b.dataset.act;
@@ -569,36 +747,61 @@ function promptName(title, label, value = "") {
   );
 }
 
+const PS1_TARGETS = ["gen2", "mcr", "srm", "gme", "vmp", "vgs"];
+const PS1_EXT = { gen2: ".mcd", mcr: ".mcr", srm: ".srm", gme: ".gme", vmp: ".vmp", vgs: ".vgs" };
+const withExt = (name, ext) => name.replace(/\.[^.]*$/, "") + ext;
+
 function newCardDialog() {
-  return openDialog(
+  const pr = openDialog(
     `<h3>${esc(t("dlg.new.title"))}</h3>` +
+    `<label>${esc(t("dlg.new.console"))}<select name="console"><option value="PS2">PS2</option><option value="PS1">PS1</option></select></label>` +
     `<label>${esc(t("dlg.new.name"))}<input type="text" name="name" value="Card1-1.mcd" autocomplete="off" spellcheck="false"></label>` +
-    `<label>${esc(t("dlg.new.size"))}<select name="size">` +
+    `<div data-for="PS2"><label>${esc(t("dlg.new.size"))}<select name="size">` +
     [1, 2, 4, 8, 16, 32, 64].map((m) => `<option value="${m}"${m === 8 ? " selected" : ""}>${m} MB${m === 8 ? " " + esc(t("dlg.new.default")) : ""}</option>`).join("") +
     `</select></label>` +
     `<label class="inline"><input type="checkbox" name="ecc"> ${t("dlg.new.ecc")}</label>` +
-    `<div class="msg small">${t("dlg.new.note")}</div>` +
+    `<div class="msg small">${t("dlg.new.note")}</div></div>` +
+    `<div data-for="PS1" hidden><label>${esc(t("dlg.new.format"))}<select name="fmt">` +
+    PS1_TARGETS.map((x) => `<option value="${x}">${esc(t(`dlg.convert.ps1.${x}`))}</option>`).join("") + `</select></label>` +
+    `<div class="msg small">${esc(t("dlg.new.ps1note"))}</div></div>` +
     `<div class="err" id="dErr"></div>` + actionsHtml(t("dlg.new.create")),
     (f) => {
       let name = f.name.value.trim();
       if (!name) { f.querySelector("#dErr").textContent = t("dlg.new.noName"); return false; }
+      const platform = f.console.value;
+      if (platform === "PS1") {
+        if (!/\.[a-z0-9]+$/i.test(name)) name += PS1_EXT[f.fmt.value];
+        return { platform, name, size: 0, ecc: false };
+      }
       if (!/\.[a-z0-9]+$/i.test(name)) name += f.ecc.checked ? ".ps2" : ".mcd";
-      return { name, size: +f.size.value, ecc: f.ecc.checked };
+      return { platform, name, size: +f.size.value, ecc: f.ecc.checked };
     },
   );
+  const sync = () => {
+    const ps1 = dform.console.value === "PS1";
+    dform.querySelectorAll("[data-for]").forEach((d) => { d.hidden = d.dataset.for !== (ps1 ? "PS1" : "PS2"); });
+    dform.name.value = withExt(dform.name.value || "Card1-1", ps1 ? PS1_EXT[dform.fmt.value] : dform.ecc.checked ? ".ps2" : ".mcd");
+  };
+  dform.console.addEventListener("change", sync);
+  dform.fmt.addEventListener("change", sync);
+  dform.ecc.addEventListener("change", sync);
+  return pr;
 }
 
-function exportFormatDialog(n) {
-  const last = storage.get("psmm-export-format", "psu") === "max" ? "max" : "psu";
-  const opt = (v, title, hint) =>
-    `<label><input type="radio" name="fmt" value="${v}"${v === last ? " checked" : ""}><b>${esc(title)}</b><span>${esc(hint)}</span></label>`;
+function exportFormatDialog(n, ps1 = false) {
+  const formats = ps1 ? ["mcs", "psv"] : ["psu", "max"];
+  const key = ps1 ? "psmm-export-format-ps1" : "psmm-export-format";
+  const saved = storage.get(key, formats[0]);
+  const last = formats.includes(saved) ? saved : formats[0];
+  const opt = (v) =>
+    `<label><input type="radio" name="fmt" value="${v}"${v === last ? " checked" : ""}><b>${esc(t(`dlg.export.${v}`))}</b><span>${esc(t(`dlg.export.${v}Hint`))}</span></label>`;
   return openDialog(
     `<h3>${esc(t("dlg.export.title"))}</h3><div class="msg">${esc(t("dlg.export.count", { n }))}</div>` +
-    `<div class="choice">${opt("psu", t("dlg.export.psu"), t("dlg.export.psuHint"))}${opt("max", t("dlg.export.max"), t("dlg.export.maxHint"))}</div>` +
+    `<div class="choice">${formats.map(opt).join("")}</div>` +
     actionsHtml(t("dlg.export.go")),
     (f) => {
       const v = f.fmt.value;
-      storage.set("psmm-export-format", v);
+      storage.set(key, v);
       return v;
     },
   );
@@ -650,7 +853,7 @@ async function actNew(p = P()) {
   const v = await newCardDialog();
   if (!v) return;
   await run("st.creating", null, async () => {
-    const r = ok(await rpc("newCard", [p.slot, v.name, v.size, v.ecc]));
+    const r = ok(await rpc("newCard", [p.slot, v.name, v.size, v.ecc, v.platform]));
     resetPane(p);
     state.active = p.slot;
     applySummary(p, r);
@@ -760,7 +963,7 @@ async function importSaves(p, files) {
   files = files.filter((f) => !f.dir);
   if (!files.length) return;
   await run("st.importing", null, async () => {
-    const info = ok(await rpc("inspectSaves", [files])).saves;
+    const info = ok(await rpc("inspectSaves", [files, p.summary.card.platform])).saves;
     const good = info.filter((x) => x.ok);
     const bad = info.filter((x) => !x.ok);
     if (!good.length) {
@@ -792,7 +995,7 @@ async function importSaves(p, files) {
 async function actExportSave(p = P()) {
   const paths = selectedSaves(p);
   if (!paths.length) { toast(t("toast.noSaves"), "error"); return; }
-  const fmt = await exportFormatDialog(paths.length);
+  const fmt = await exportFormatDialog(paths.length, isPs1(p));
   if (!fmt) return;
   await run("st.exporting", null, async () => {
     const r = ok(await rpc("exportSaves", [p.slot, paths, fmt]));
@@ -879,19 +1082,28 @@ async function actRename(p = P()) {
 }
 
 async function actDelete(p = P()) {
-  const items = [...p.selected].map((x) => p.byPath.get(x)).filter(Boolean);
+  const items = [...p.selected].map((x) => p.byPath.get(x)).filter((e) => e && !e.deleted);
   if (!items.length) return;
   const prot = items.some((e) => e.protected);
   const names = items.slice(0, 8).map((e) => `• ${e.title ? `${e.title} (${e.name})` : e.name}`).join("\n") +
     (items.length > 8 ? "\n" + t("dlg.delete.more", { n: items.length - 8 }) : "");
   const msg = (items.length === 1 ? t("dlg.delete.one") : t("dlg.delete.many", { n: items.length })) + `\n\n${names}` +
-    (prot ? "\n\n" + t("dlg.delete.protected") : "") + "\n\n" + t("dlg.delete.undo");
+    (prot ? "\n\n" + t("dlg.delete.protected") : "") + "\n\n" + t(isPs1(p) ? "dlg.delete.ps1" : "dlg.delete.undo");
   if (!(await confirmDialog(t("dlg.delete.title"), msg, t("dlg.delete"), true))) return;
   await run("st.deleting", null, async () => {
     applySummary(p, ok(await rpc("remove", [p.slot, items.map((e) => e.path)])));
-    p.selected.clear();
+    if (!isPs1(p)) p.selected.clear(); // PS1 saves stay (deleted) where they were
     render();
     status("st.deleted", { n: items.length });
+  });
+}
+
+async function actRestore(p = P()) {
+  const paths = selectedRestorable(p);
+  if (!paths.length) return;
+  await run("st.restoring", null, async () => {
+    applySummary(p, ok(await rpc("restore", [p.slot, paths])));
+    status("st.restored", { n: paths.length });
   });
 }
 
@@ -936,7 +1148,7 @@ const ACTIONS = {
   importSave: () => { pickTarget = state.active; $("#pickSaves").value = ""; $("#pickSaves").click(); },
   exportSave: () => actExportSave(),
   mkdir: () => actMkdir(), extract: () => actExtract(), rename: () => actRename(), delete: () => actDelete(),
-  check: () => actCheck(), dual: actDual, copy: () => actCopy(), sd: () => actOpenSd(),
+  check: () => actCheck(), dual: actDual, copy: () => actCopy(), sd: () => actOpenSd(), restore: () => actRestore(),
   convert: () => actConvert(), split: () => actSplit(), resize: () => actResize(),
 };
 
@@ -968,6 +1180,8 @@ $("#panes").addEventListener("focusin", (ev) => {
   if (el) setActive(el.dataset.slot);
 });
 $("#panes").addEventListener("click", (ev) => {
+  const blk = ev.target.closest(".blockmap .blk[data-path]");
+  if (blk) { const p = panes[blk.closest(".pane").dataset.slot]; select(p, blk.dataset.path, { toggle: ev.ctrlKey || ev.metaKey }); return; }
   const b = ev.target.closest("[data-pane-act]");
   if (!b || state.busy) return;
   const p = panes[b.closest(".pane").dataset.slot];
@@ -990,7 +1204,8 @@ function bindTree(p) {
     const row = ev.target.closest(".row");
     if (!row) return;
     const e = p.byPath.get(row.dataset.path);
-    if (e?.dir) toggleExpand(p, e.path);
+    if (e?.ps1) { if (!e.deleted) actExportSave(p); }
+    else if (e?.dir) toggleExpand(p, e.path);
     else if (e) actExtract(p);
   });
   tree.addEventListener("keydown", (ev) => {
@@ -1101,6 +1316,21 @@ function showMenu(p, ev) {
   const sel = p.selected.size;
   const item = (act, icon, label, enabled = true, cls = "") =>
     `<button data-act="${act}" ${enabled && !state.busy ? "" : "disabled"} class="${cls}"><i data-icon="${icon}"></i>${esc(label)}</button>`;
+  if (isPs1(p)) {
+    const ro = p.summary.card.readOnly;
+    let ps1Html = item("importSave", "import-save", t("menu.importSave"), !ro) + "<hr>";
+    if (canCopy(p)) ps1Html += item("copy", "copy", t("menu.copyTo", { slot: otherSlot(p.slot) }));
+    if (selectedSaves(p).length) ps1Html += item("exportSave", "export-save", t("menu.exportSave"));
+    if (selectedRestorable(p).length) ps1Html += item("restore", "undo", t("menu.restore"));
+    ps1Html += item("delete", "delete", t("menu.delete"), selectedSaves(p).length > 0 && !ro, "danger");
+    menu.innerHTML = ps1Html;
+    paintIcons(menu);
+    menu.hidden = false;
+    const r = menu.getBoundingClientRect();
+    menu.style.left = Math.min(ev.clientX, window.innerWidth - r.width - 8) + "px";
+    menu.style.top = Math.min(ev.clientY, window.innerHeight - r.height - 8) + "px";
+    return;
+  }
   let html =
     item("addFiles", "add-file", t("menu.addFiles", { dir: targetDir(p) })) +
     item("addFolder", "import-folder", t("menu.addFolder")) +
@@ -1166,6 +1396,12 @@ document.addEventListener("dragover", (ev) => {
   if (internalDrag) {
     const { pane, dir } = dropTarget(ev);
     const okTarget = pane && pane.slot !== internalDrag.slot && pane.summary && dir;
+    if (okTarget && (isPs1(pane) !== isPs1(panes[internalDrag.slot]) || pane.summary.card.readOnly)) {
+      highlight(null);
+      overlay.hidden = false;
+      $("#dropText").textContent = pane.summary.card.readOnly ? t("toast.readOnly") : t("drop.noMix");
+      return;
+    }
     if (okTarget) {
       ev.preventDefault();
       ev.dataTransfer.dropEffect = "copy";
@@ -1197,7 +1433,7 @@ document.addEventListener("drop", async (ev) => {
     overlay.hidden = true;
     highlight(null);
     const { pane, dir } = dropTarget(ev);
-    if (pane && pane.slot !== drag.slot && pane.summary && dir) {
+    if (pane && pane.slot !== drag.slot && pane.summary && dir && isPs1(pane) === isPs1(panes[drag.slot]) && !pane.summary.card.readOnly) {
       setActive(pane.slot);
       copyItems(drag.slot, drag.paths, pane.slot, dir);
     }
@@ -1221,6 +1457,11 @@ document.addEventListener("drop", async (ev) => {
   }
   if (!p.summary) { toast(t("toast.notCard"), "error"); return; }
   setActive(p.slot);
+  if (isPs1(p)) {
+    if (anyDir) { toast(t("toast.ps1NoFolders"), "error"); return; }
+    if (p.summary.card.readOnly && !files.every(looksLikeCard)) { toast(t("toast.readOnly"), "error"); return; }
+    return importFiles(p, await filesFromInput(files)); // PS1 cards only take saves (and whole cards)
+  }
   if (!anyDir && files.length && files.every((f) => hasExt(f.name, SAVE_EXT) || looksLikeCard(f))) {
     return importFiles(p, await filesFromInput(files));
   }
@@ -1232,7 +1473,7 @@ document.addEventListener("drop", async (ev) => {
 // API on Chrome/Edge; read-only folder upload elsewhere), Python does the
 // layout and INI logic.
 
-const SD_CREATABLE = ["PS2", "COH"]; // PS1 cards: phase 5; Conquest uses its own format
+const SD_CREATABLE = ["PS2", "PS1", "COH"]; // Conquest (SC2) cards use their own format
 let sd = null; // {root, name, readOnly, fileMap, data, texts, expanded}
 
 async function actOpenSd() {
@@ -1418,7 +1659,6 @@ function sdClose() {
 }
 
 async function sdOpenChannel(variant, path) {
-  if (variant.toUpperCase() === "PS1") { toast(t("sd.ps1Later"), "error"); return; }
   const where = sdOpenSlot(path);
   if (where) { setActive(where); return; }
   const p = P();
@@ -1447,6 +1687,7 @@ const GAME_ID_RE = /^[A-Z]{4}[-_ ]?\d{3}\.?\d{2}$/i;
 async function sdNewCard(variant) {
   const v = sdVariant(variant) || { nextIndex: 1 };
   const { sizes, def } = sdSizeOptions(variant);
+  const ps1 = variant.toUpperCase() === "PS1";
   const choice = await openDialog(
     `<h3>${esc(t("dlg.sdnew.title"))} · ${esc(variant)}</h3>` +
     `<div class="choice">` +
@@ -1454,8 +1695,9 @@ async function sdNewCard(variant) {
     `<label><input type="radio" name="kind" value="game"><b>${esc(t("dlg.sdnew.game"))}</b><span>${esc(t("dlg.sdnew.note"))}</span></label>` +
     `</div>` +
     `<label>${esc(t("dlg.sdnew.gameId"))}<input type="text" name="game" class="mono" placeholder="SLUS-20963" autocomplete="off" spellcheck="false"></label>` +
-    `<label>${esc(t("dlg.sdnew.size"))}<select name="size">` +
-    sizes.map((m) => `<option value="${m}"${m === def ? " selected" : ""}>${m} MB</option>`).join("") + `</select></label>` +
+    (ps1 ? `<div class="msg small">${esc(t("dlg.sdnew.ps1note"))}</div>` :
+      `<label>${esc(t("dlg.sdnew.size"))}<select name="size">` +
+      sizes.map((m) => `<option value="${m}"${m === def ? " selected" : ""}>${m} MB</option>`).join("") + `</select></label>`) +
     `<div class="err" id="dErr"></div>` + actionsHtml(t("dlg.sdnew.create")),
     (f) => {
       const kind = f.kind.value;
@@ -1464,14 +1706,14 @@ async function sdNewCard(variant) {
         f.querySelector("#dErr").textContent = t("sd.badGameId");
         return false;
       }
-      return { kind, game: kind === "game" ? game : "", size: +f.size.value };
+      return { kind, game: kind === "game" ? game : "", size: ps1 ? 0 : +f.size.value };
     },
   );
   if (!choice) return;
   let createdPath = null;
   await run("st.creating", null, async () => {
     const plan = ok(await rpc("sdPlanCard", [variant, choice.game]));
-    const blank = ok(await rpc("blankCard", [choice.size]));
+    const blank = ok(await rpc("blankCard", [choice.size, ps1 ? "PS1" : "PS2"]));
     await sdWrite(plan.path, blank.data);
     sd.expanded.add(`${plan.variant}/${plan.folder}`);
     await sdRefresh();
@@ -1484,11 +1726,13 @@ async function sdNewCard(variant) {
 async function sdAddChannel(variant, folder) {
   let plan;
   try { plan = ok(await rpc("sdPlanChannel", [variant, folder])); } catch (e) { toast(e.message, "error"); return; }
+  const ps1 = variant.toUpperCase() === "PS1";
   const mb = plan.size ? Math.max(1, Math.round(plan.size / 1048576)) : sd.data.defaultSizeMB;
   const label = sdFolder(variant, folder)?.label || folder;
-  if (!(await confirmDialog(t("dlg.sdch.title"), t("dlg.sdch.msg", { n: plan.channel, folder: label, size: `${mb} MB`, path: plan.path }), t("dlg.sdch.create")))) return;
+  const sizeText = ps1 ? "128 KB" : `${mb} MB`;
+  if (!(await confirmDialog(t("dlg.sdch.title"), t("dlg.sdch.msg", { n: plan.channel, folder: label, size: sizeText, path: plan.path }), t("dlg.sdch.create")))) return;
   await run("st.creating", null, async () => {
-    const blank = ok(await rpc("blankCard", [mb]));
+    const blank = ok(await rpc("blankCard", [mb, ps1 ? "PS1" : "PS2"]));
     await sdWrite(plan.path, blank.data);
     await sdRefresh();
     toast(t("toast.sdCreated", { path: plan.path }), "ok");
@@ -1629,13 +1873,13 @@ async function sdGame2Folder() {
 // ---------------------------------------------------------------------------
 // Phase 4: whole cards (import / convert / split by game)
 
-const isCardName = (name) => hasExt(name, CARD_EXT);
+const isCardFile = (f) => isCardLike(f.rel, f.data.byteLength);
 
 // "Import save": save files go through importSaves, card images through importCards
 async function importFiles(p, files) {
   files = files.filter((f) => !f.dir);
-  const cards = files.filter((f) => isCardName(f.rel));
-  const saves = files.filter((f) => !isCardName(f.rel));
+  const cards = files.filter(isCardFile);
+  const saves = files.filter((f) => !isCardFile(f));
   if (saves.length && !p.summary) toast(t("dlg.cards.mergeNone"), "error");
   if (saves.length && p.summary) await importSaves(p, saves);
   if (cards.length) await importCards(p, cards);
@@ -1653,7 +1897,9 @@ async function importCards(p, files) {
     await alertDialog(t("dlg.cards.title"), t("dlg.cards.none") + "\n\n" + bad.map((b) => `• ${b.file}: ${b.error}`).join("\n"));
     return;
   }
-  const canMerge = !!p.summary;
+  const platforms = [...new Set(good.map((c) => c.platform))];
+  const mixMerge = !!p.summary && platforms.some((x) => x !== p.summary.card.platform);
+  const canMerge = !!p.summary && !mixMerge && !p.summary.card.readOnly;
   const canSd = canWriteSd();
   const def = canSd ? "sd" : canMerge ? "merge" : "zip";
   const items = good.map((c, i) => {
@@ -1671,7 +1917,8 @@ async function importCards(p, files) {
     `<h3>${esc(t("dlg.cards.title"))}</h3><ul class="card-list">${items}</ul>` +
     (bad.length ? `<div class="msg small">${esc(t("dlg.cards.bad"))} ${esc(bad.map((b) => b.file).join(", "))}</div>` : "") +
     `<div class="choice">` +
-    opt("merge", t("dlg.cards.merge", { slot: p.slot }), canMerge ? t("dlg.cards.mergeHint", { name: p.summary.card.name }) : t("dlg.cards.mergeNone"), canMerge) +
+    opt("merge", t("dlg.cards.merge", { slot: p.slot }), canMerge ? t("dlg.cards.mergeHint", { name: p.summary.card.name })
+      : mixMerge ? t("dlg.cards.mixMerge", { platform: platforms.join("/") }) : p.summary?.card.readOnly ? t("toast.readOnly") : t("dlg.cards.mergeNone"), canMerge) +
     opt("sd", t("dlg.cards.sd"), canSd ? t("dlg.cards.sdHint") : t("dlg.cards.sdNone"), canSd) +
     opt("zip", t("dlg.cards.zip"), t("dlg.cards.zipHint"), true) +
     `</div><div class="err" id="dErr"></div>` + actionsHtml(t("dlg.cards.go")),
@@ -1704,10 +1951,11 @@ async function importCards(p, files) {
     await run("st.importing", null, async () => {
       const done = [];
       for (let i = 0; i < good.length; i++) {
-        const plan = ok(await rpc("sdPlanImport", [choice.games[i], good[i].sizeMB * 1048576]));
+        const variant = good[i].platform === "PS1" ? "PS1" : "PS2";
+        const plan = ok(await rpc("sdPlanImport", [choice.games[i], good[i].size, variant]));
         const card = ok(await rpc("prepareStagedCard", [good[i].file]));
         await sdWrite(plan.path, card.data);
-        sd.expanded.add(`PS2/${plan.folder}`);
+        sd.expanded.add(`${variant}/${plan.folder}`);
         done.push(plan.path + (plan.existing ? " " + t("toast.newChannel", { n: plan.channel }) : ""));
       }
       await sdRefresh();
@@ -1727,8 +1975,37 @@ const CONVERT_TARGETS = ["gen2", "opl", "pcsx2", "mcp2"];
 const oplVmcName = (game) => (game ? `${game.slice(0, 4)}_${game.slice(5, 8)}.${game.slice(8, 10)}_0.bin` : null);
 const TARGET_EXT = { gen2: ".mcd", opl: ".bin", pcsx2: ".ps2", mcp2: ".mc2" };
 
+async function actConvertPs1(p) {
+  const c = p.summary.card;
+  const current = c.container === "raw" ? (c.originId === "epsxe" ? "mcr" : c.originId === "retroarch" ? "srm" : "gen2") : c.container;
+  const def = current === "gen2" ? "vmp" : "gen2";
+  const opt = (v) =>
+    `<label><input type="radio" name="fmt" value="${v}"${v === def ? " checked" : ""}><b>${esc(t(`dlg.convert.ps1.${v}`))}</b><span>${esc(t(`dlg.convert.ps1.${v}Hint`))}</span></label>`;
+  const pr = openDialog(
+    `<h3>${esc(t("dlg.convert.title"))}</h3>` +
+    `<div class="choice">${PS1_TARGETS.map(opt).join("")}</div>` +
+    `<div class="msg small">${esc(t("dlg.convert.ps1note"))}</div>` +
+    `<label>${esc(t("dlg.convert.file"))}<input type="text" name="file" value="${esc(withExt(c.name, PS1_EXT[def]))}" autocomplete="off"></label>` +
+    actionsHtml(t("dlg.convert.go")),
+    (f) => ({ target: f.fmt.value, file: f.file.value.trim() || withExt(c.name, PS1_EXT[f.fmt.value]) }),
+  );
+  dform.querySelectorAll("input[name=fmt]").forEach((r) => r.addEventListener("change", () => {
+    const input = dform.querySelector("input[name=file]");
+    input.value = withExt(input.value || c.name, PS1_EXT[r.value]);
+  }));
+  const v = await pr;
+  if (!v) return;
+  await run("st.converting", null, async () => {
+    const r = ok(await rpc("convertCard", [p.slot, v.target, 0]));
+    download(v.file, r.data);
+    toast(t("toast.converted", { name: v.file, size: human(r.size) }), "ok");
+    status("st.extracted", { name: v.file, size: human(r.size) });
+  });
+}
+
 async function actConvert(p = P()) {
   if (!p.summary) return;
+  if (isPs1(p)) return actConvertPs1(p);
   const c = p.summary.card;
   const current = c.originId === "pcsx2" ? "pcsx2" : c.originId;
   const def = current === "gen2" ? "pcsx2" : "gen2";
@@ -1768,7 +2045,8 @@ async function actSplit(p = P()) {
   let prev = null;
   await run("st.reading", null, async () => { prev = ok(await rpc("splitPreview", [p.slot])); });
   if (!prev) return;
-  if (!prev.games.length) { toast(t("toast.noGames"), "error"); return; }
+  const ps1 = isPs1(p);
+  if (!prev.games.length) { toast(t(ps1 ? "toast.noGamesPs1" : "toast.noGames"), "error"); return; }
   const canSd = canWriteSd();
   await loadGameDb();
   const list = prev.games.map((g) => `<li><div class="t">${esc(g.game)} <span class="split-game">${esc(gameName(g.game) || "")}</span></div><div class="titles">${esc(g.titles.join(" · "))}</div></li>`).join("");
@@ -1778,13 +2056,14 @@ async function actSplit(p = P()) {
     `<h3>${esc(t("dlg.split.title"))}</h3><div class="msg small">${esc(t("dlg.split.games", { n: prev.games.length }))}</div>` +
     `<ul class="card-list">${list}</ul>` +
     (prev.others.length ? `<label class="inline"><input type="checkbox" name="others"> ${esc(t("dlg.split.others", { list: prev.others.join(", ") }))}</label>` : "") +
-    `<label>${esc(t("dlg.split.size"))}<select name="size">${[1, 2, 4, 8, 16, 32, 64].map((m) => `<option value="${m}"${m === 8 ? " selected" : ""}>${m} MB</option>`).join("")}</select></label>` +
+    (ps1 ? `<div class="msg small">${esc(t("dlg.split.ps1size"))}</div>` :
+      `<label>${esc(t("dlg.split.size"))}<select name="size">${[1, 2, 4, 8, 16, 32, 64].map((m) => `<option value="${m}"${m === 8 ? " selected" : ""}>${m} MB</option>`).join("")}</select></label>`) +
     `<div class="choice">` +
-    opt("sd", t("dlg.split.sd"), canSd ? t("dlg.split.sdHint") : t("dlg.cards.sdNone"), canSd, canSd) +
-    opt("zip", t("dlg.split.zip"), t("dlg.split.zipHint"), true, !canSd) +
-    opt("zip-opl", t("dlg.split.opl"), t("dlg.split.oplHint"), true, false) +
+    opt("sd", t("dlg.split.sd"), canSd ? t(ps1 ? "dlg.split.sdHintPs1" : "dlg.split.sdHint") : t("dlg.cards.sdNone"), canSd, canSd) +
+    opt("zip", t("dlg.split.zip"), t(ps1 ? "dlg.split.zipHintPs1" : "dlg.split.zipHint"), true, !canSd) +
+    (ps1 ? "" : opt("zip-opl", t("dlg.split.opl"), t("dlg.split.oplHint"), true, false)) +
     `</div>` + actionsHtml(t("dlg.split.go")),
-    (f) => ({ dest: f.dest.value, size: +f.size.value, others: !!f.others?.checked }),
+    (f) => ({ dest: f.dest.value, size: ps1 ? 0 : +f.size.value, others: !!f.others?.checked }),
   );
   if (!v) return;
   await run("st.splitting", null, async () => {
@@ -1796,11 +2075,12 @@ async function actSplit(p = P()) {
     }
     const r = ok(await rpc("splitCard", [p.slot, v.size, v.others, "files"]));
     const done = [];
+    const variant = ps1 ? "PS1" : "PS2";
     for (const c of r.cards) {
-      const plan = ok(await rpc("sdPlanImport", [c.game, v.size * 1048576]));
+      const plan = ok(await rpc("sdPlanImport", [c.game, ps1 ? PS1_SIZE : v.size * 1048576, variant]));
       const file = ok(await rpc("readFile", [c.path]));
       await sdWrite(plan.path, file.data);
-      sd.expanded.add(`PS2/${plan.folder}`);
+      sd.expanded.add(`${variant}/${plan.folder}`);
       done.push(plan.path + (plan.existing ? " " + t("toast.newChannel", { n: plan.channel }) : ""));
     }
     await sdRefresh();

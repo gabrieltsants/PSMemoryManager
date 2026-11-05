@@ -430,3 +430,28 @@ dialog .err { color: var(--danger); font-size: 12.5px; min-height: 1em; }
   .lang select { max-width: 104px; }
   .brand-name { font-size: 15px; }
 }
+
+/* PS1 cards ------------------------------------------------------------- */
+.ricon.ps1 { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
+.ps1-icon, .ps1-big { image-rendering: pixelated; image-rendering: crisp-edges; }
+.ps1-icon { width: 20px; height: 20px; }
+.ps1-icon.none, .ps1-big.none { display: inline-flex; width: 20px; height: 20px; }
+.ps1-icon.none svg, .ps1-big.none svg { width: 100%; height: 100%; }
+.row.deleted .nm, .row.deleted .c-title { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.row.deleted .ps1-icon { opacity: .45; filter: grayscale(1); }
+.tag { font-size: 11px; line-height: 16px; padding: 0 6px; border-radius: 99px; border: 1px solid var(--border); color: var(--muted); flex: none; text-decoration: none; }
+.tag.del { color: var(--warn); border-color: var(--warn); }
+.blockmap { display: grid; grid-template-columns: repeat(15, 1fr); gap: 3px; }
+.blk { height: 18px; border-radius: 4px; font-size: 10px; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); cursor: default; user-select: none; }
+.blk[data-path] { cursor: pointer; }
+.blk.del { border-style: dashed; }
+.blk.odd { background: repeating-linear-gradient(135deg, var(--surface-2) 0 3px, var(--border) 3px 5px); color: var(--text); }
+.blk.sel { outline: 2px solid var(--text); outline-offset: 1px; }
+.blk.h0, .blk.h1, .blk.h2, .blk.h3, .blk.h4, .blk.h5 { color: #fff; border-color: transparent; }
+.blk.h0 { background: #2f6fed; } .blk.h1 { background: #0f9d76; } .blk.h2 { background: #c2561a; }
+.blk.h3 { background: #8a4fd8; } .blk.h4 { background: #c23a6b; } .blk.h5 { background: #4b7a12; }
+.ps1-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.ps1-head h2 { margin: 0; }
+.ps1-big { width: 48px; height: 48px; flex: none; border-radius: 6px; background: var(--surface-2); }
+.det-actions { margin-top: 12px; display: flex; gap: 8px; }

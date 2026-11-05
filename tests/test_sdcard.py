@@ -106,7 +106,8 @@ def test_web_api_sd(tmp_path, monkeypatch):
     r = json.loads(w.sd_load(json.dumps(FILES), json.dumps(TEXTS)))
     assert r["ok"] and r["defaultSizeMB"] == 16 and r["variants"][0]["name"] == "PS2"
     assert json.loads(w.sd_plan_card("PS2"))["folder"] == "Card2"
-    assert json.loads(w.sd_plan_card("PS1"))["kind"] == "card"
+    assert json.loads(w.sd_plan_card("PS1"))["path"].startswith("MemoryCards/PS1/Card")
+    assert json.loads(w.sd_plan_card("SC2"))["kind"] == "card"  # Conquest cards use their own format
     assert json.loads(w.sd_plan_card("PS2", "xyz"))["kind"] == "card"
     assert json.loads(w.sd_plan_channel("PS2", "SLUS-20963"))["channel"] == 2
     r = json.loads(w.blank_card(1))

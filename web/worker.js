@@ -72,7 +72,7 @@ const handlers = {
     py.FS.writeFile("/psmm/incoming.bin", new Uint8Array(buffer));
     return call("open_card", slot, name);
   },
-  newCard: async (slot, name, sizeMB, ecc) => call("new_card", slot, name, sizeMB, ecc),
+  newCard: async (slot, name, sizeMB, ecc, platform) => call("new_card", slot, name, sizeMB, ecc, platform || "PS2"),
   closeCard: async (slot) => call("close_card", slot),
   summary: async (slot) => call("summary", slot),
 
@@ -83,15 +83,16 @@ const handlers = {
   mkdir: async (slot, path) => call("mkdir", slot, path),
   remove: async (slot, paths) => call("remove", slot, JSON.stringify(paths)),
   rename: async (slot, path, newName) => call("rename", slot, path, newName),
+  restore: async (slot, paths) => call("restore", slot, JSON.stringify(paths)),
   copy: async (src, paths, dst, destDir, overwrite) =>
     call("copy_items", src, JSON.stringify(paths), dst, destDir, !!overwrite),
   check: async (slot) => call("check", slot),
   undo: async (slot) => call("undo", slot),
   markSaved: async (slot) => call("mark_saved", slot),
 
-  inspectSaves: async (files) => {
+  inspectSaves: async (files, platform) => {
     stage(files);
-    return call("inspect_staged_saves");
+    return call("inspect_staged_saves", platform || "PS2");
   },
   // files == null: reuse what is already staged (after inspectSaves)
   importSaves: async (slot, files, overwrite) => {
@@ -110,7 +111,7 @@ const handlers = {
   sdWriteGame2Folder: async (rows) => call("sd_write_game2folder", JSON.stringify(rows)),
   sdPlanCard: async (variant, gameId) => call("sd_plan_card", variant, gameId || ""),
   sdPlanChannel: async (variant, folder) => call("sd_plan_channel", variant, folder),
-  blankCard: async (sizeMB) => takeFile(call("blank_card", sizeMB, false), true),
+  blankCard: async (sizeMB, platform) => takeFile(call("blank_card", sizeMB, false, platform || "PS2"), true),
 
   // whole cards: import (OPL VMCs...), convert, split by game
   inspectCards: async (files) => {
@@ -120,7 +121,7 @@ const handlers = {
   importCards: async (slot, names, overwrite) => call("import_staged_cards", slot, JSON.stringify(names), !!overwrite),
   prepareStagedCard: async (name) => takeFile(call("prepare_staged_card", name), true),
   stagedCardsZip: async (items, layout) => takeFile(call("staged_cards_zip", JSON.stringify(items), layout || "gen2"), true),
-  sdPlanImport: async (game, size) => call("sd_plan_import", game, size),
+  sdPlanImport: async (game, size, variant) => call("sd_plan_import", game, size, variant || "PS2"),
   convertCard: async (slot, target, sizeMB) => takeFile(call("convert_card", slot, target, sizeMB), true),
   splitPreview: async (slot) => call("split_preview", slot),
   resizeCard: async (slot, sizeMB) => call("resize_card", slot, sizeMB),

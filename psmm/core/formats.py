@@ -47,6 +47,13 @@ class Origin(enum.Enum):
     OPL = "opl"
     PCSX2 = "pcsx2"
     MCP2 = "mcp2"
+    # PS1 card images
+    EPSXE = "epsxe"  # raw .mcr (ePSXe, DuckStation, Mednafen...)
+    RETROARCH = "retroarch"  # raw .srm
+    DEXDRIVE = "dexdrive"  # .gme
+    PSP = "psp"  # .vmp (PSP / PS Vita)
+    VGS = "vgs"  # .vgs / .mem (Connectix Virtual Game Station)
+    RAW = "raw"  # raw PS1 image with another extension
     UNKNOWN = "unknown"
 
     @property
@@ -83,6 +90,7 @@ class CardFormat:
     card_flags: int = 0
     version: str = ""
     size_mismatch: bool = False  # file size does not match the superblock
+    container: str = ""  # PS1: "raw" | "gme" | "vgs" | "vmp"
 
     @property
     def cluster_size(self) -> int:
@@ -99,7 +107,7 @@ class CardFormat:
 
     def describe(self) -> str:
         if self.platform is Platform.PS1:
-            return t("fmt.describe_ps1")
+            return t("fmt.describe_ps1", origin=self.origin.label)
         ecc = t("ecc.yes" if self.layout is Layout.ECC else "ecc.no")
         return t("fmt.describe_ps2", mb=self.nominal_mb, ecc=ecc, origin=self.origin.label)
 
@@ -128,7 +136,7 @@ def detect(path: str | os.PathLike) -> CardFormat:
     try:
         size = p.stat().st_size
         with open(p, "rb") as f:
-            head = f.read(0x154)
+            head = f.read(4096)
     except OSError as e:
         raise FormatError("fmt.read_failed", error=e) from e
 
@@ -172,9 +180,13 @@ def detect(path: str | os.PathLike) -> CardFormat:
             size_mismatch=mismatch,
         )
 
-    if head.startswith(PS1_MAGIC) and size in (PS1_CARD_SIZE,):
+    from . import ps1  # imports this module
+
+    container = ps1.sniff(head, size)
+    if container is not None:
         return CardFormat(
-            platform=Platform.PS1, layout=Layout.RAW, origin=origin, file_size=size
+            platform=Platform.PS1, layout=Layout.RAW, origin=ps1.origin_of(container, p.name),
+            file_size=size, container=container, size_mismatch=size != ps1.CONTAINER_SIZES[container],
         )
 
     if size in (0, 8 * 1024 * 1024) and head.strip(b"\xff\x00") == b"":
