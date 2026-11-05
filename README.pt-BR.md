@@ -12,6 +12,12 @@ Prefere um programa no computador? **[Baixe o aplicativo local](https://github.c
 
 > **Antes de editar:** faça backup dos memory cards e de todo o cartão SD. O PSMemoryManager é fornecido como está e seu uso é por sua conta e risco. O projeto e seus colaboradores não se responsabilizam por saves perdidos ou corrompidos, cartões danificados ou qualquer outra perda ou dano decorrente do uso.
 
+![Um cartão de PS2 com os ícones 3D dos saves na lista e o ícone do Silent Hill 2 girando no painel de detalhes](docs/img/ps2-icons.gif)
+
+![Cópia de um save entre dois memory cards](docs/img/two-cards.gif)
+
+![PSMemoryManager exibindo um cartão SD Gen2, seus memory cards e os saves de um cartão aberto](docs/img/hero-light.png)
+
 ## O que dá para fazer
 
 - **Ver o que tem no cartão:** cada save com o nome do jogo, ícone, tamanho e região, e quanto espaço sobra. Os saves de PS2 mostram os ícones 3D, animados como no console. Digite na caixa de busca para achar um save pelo nome, título ou código do jogo.
@@ -22,12 +28,6 @@ Prefere um programa no computador? **[Baixe o aplicativo local](https://github.c
 - **Converter cartões** entre aparelhos e emuladores, juntar cartões ou separar um cartão em um cartão por jogo.
 - **Gerenciar o cartão SD do PSxMemCard Gen2 / SD2PSX:** veja todos os cartões e canais, abra e salve direto no SD, crie novos, dê nome aos canais e altere as configurações do aparelho. **Todos os saves** lista os saves de todos os cartões num lugar só (e mostra os que estão em mais de um cartão), e **Backup** guarda o cartão SD inteiro em um arquivo .zip.
 - **Verificar um cartão** em busca de erros.
-
-![Um cartão de PS2 com os ícones 3D dos saves na lista e o ícone do Silent Hill 2 girando no painel de detalhes](docs/img/ps2-icons.gif)
-
-![Cópia de um save entre dois memory cards](docs/img/two-cards.gif)
-
-![PSMemoryManager exibindo um cartão SD Gen2, seus memory cards e os saves de um cartão aberto](docs/img/hero-light.png)
 
 Funciona em computadores e celulares, nos temas claro e escuro, em português ou inglês (segue o idioma do navegador; dá para trocar na barra superior).
 
