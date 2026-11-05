@@ -75,6 +75,7 @@ const handlers = {
   newCard: async (slot, name, sizeMB, ecc, platform) => call("new_card", slot, name, sizeMB, ecc, platform || "PS2"),
   closeCard: async (slot) => call("close_card", slot),
   summary: async (slot) => call("summary", slot),
+  icons: async (slot, paths) => call("icons", slot, JSON.stringify(paths)),
 
   add: async (slot, files, destDir, overwrite) => {
     stage(files);

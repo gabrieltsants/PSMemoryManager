@@ -29,6 +29,10 @@
 
 Save folders are named like `BASLUS-20963…`: `B` + region letter (`A` America, `E` Europe, `I` Japan, `K` Korea, `C` China) + game code. Saves copied to the root of another card keep their dates and attributes, including the FreeMcBoot "protected" flag.
 
+### PS2 save icons
+
+A save's `icon.sys` names its icon file (`.ico`/`.icn`): a small 3D model with a 128×128 texture (raw or RLE-compressed) and, in some games, an animation that blends between several shapes. `icon.sys` also sets the background colours and the three lights. The page reads the icons after the card is shown and draws them with WebGL: a still thumbnail in the list and the animated model in the details panel (drag to turn it). Saves without `icon.sys`, or whose icon file is missing or broken, keep the generic save symbol. Browsers without hardware-accelerated WebGL also keep the generic symbol, because drawing the models in software would freeze the page.
+
 ## PS1 memory cards
 
 A PS1 card has 128 KB: 16 blocks of 8 KB. Block 0 is the directory; blocks 1–15 hold saves, and a save takes one or more blocks (not always next to each other). Each save's first block holds its title (in Shift-JIS, so Japanese titles show correctly) and a 16×16 icon with 1 to 3 animation frames.

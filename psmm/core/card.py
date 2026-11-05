@@ -152,6 +152,18 @@ class Entry:
 
 
 @dataclass
+class SaveIcon:
+    """A save's 3D icon file (raw .ico/.icn bytes) plus how icon.sys says to show it."""
+
+    data: bytes
+    bg_colors: list[tuple[int, int, int]]  # top-left, top-right, bottom-left, bottom-right; 0..128
+    bg_alpha: int  # 0..128
+    light_dirs: list[tuple[float, float, float]]  # 3 lights
+    light_colors: list[tuple[float, float, float]]  # 0..1
+    ambient: tuple[float, float, float]  # 0..1
+
+
+@dataclass
 class CardInfo:
     path: Path
     format: CardFormat
@@ -445,6 +457,48 @@ class _Reader:
             return _clean_title(f"{t1} {t2}")
         except Exception:
             return ""
+
+    def icon(self, dirpath: str, kind: str = "normal") -> "SaveIcon | None":
+        """The 3D icon of a save folder, with the colours and lights from its icon.sys.
+
+        ``kind`` is "normal", "copy" or "delete" (icon.sys names one file for each;
+        many games use the same file for all three). Returns ``None`` when the
+        folder has no icon.sys or the icon file it names is missing. The icon
+        file itself is not parsed here: the page decodes and draws it.
+        """
+        dirpath = norm_path(dirpath)
+        try:
+            data = self._mc.get_icon_sys(dirpath)
+            if not data:
+                return None
+            s = _iconsys.IconSys(data)
+        except Exception:
+            return None
+        name = {"copy": s.icon_file_copy, "delete": s.icon_file_delete}.get(kind) or s.icon_file_normal
+        if not name:
+            return None
+        try:
+            ico = self.read_file(join_path(dirpath, name))
+        except CardError:
+            # some icon.sys files name the icon with a different case than the file
+            match = next((n for n, ent in self._raw_entries(dirpath)
+                          if n.lower() == name.lower() and not ent[0] & DF_DIR), None)
+            if match is None:
+                return None
+            try:
+                ico = self.read_file(join_path(dirpath, match))
+            except CardError:
+                return None
+        if not ico:
+            return None
+        return SaveIcon(
+            data=ico,
+            bg_colors=[tuple(c[:3]) for c in s.bg_colors],
+            bg_alpha=s.background_transparency,
+            light_dirs=[tuple(d[:3]) for d in s.light_dirs],
+            light_colors=[tuple(c[:3]) for c in s.light_colors],
+            ambient=tuple(s.ambient_light_color[:3]),
+        )
 
     # -- space --------------------------------------------------------------
 

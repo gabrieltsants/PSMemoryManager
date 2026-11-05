@@ -15,6 +15,7 @@ directly. The user's original file only changes when they save/download.
 
 from __future__ import annotations
 
+import base64
 import io
 import json
 import os
@@ -56,6 +57,8 @@ class _Slot:
     history: list[bytes] = field(default_factory=list)
     version: int = 0  # incremented on every change
     saved_version: int = 0
+    icons: dict = field(default_factory=dict)  # PS2 icons sent to the page: path -> dict | None
+    icons_version: int = -1  # card version the cache above belongs to
 
 
 _slots: dict[str, _Slot] = {s: _Slot() for s in SLOTS}
@@ -274,6 +277,7 @@ def _close(name: str) -> None:
     s.card = None
     s.history.clear()
     s.version = s.saved_version = 0
+    s.icons, s.icons_version = {}, -1
     shutil.rmtree(_cards_dir(name), ignore_errors=True)
 
 
@@ -405,6 +409,41 @@ def add_staged(slot: str, dest_dir: str, overwrite: bool = False) -> str:
             ed.add_local(item, norm_path(dest_dir), overwrite=bool(overwrite))
 
     return _result(_edit, slot, apply)
+
+
+def _icon_dict(ic) -> dict | None:
+    if ic is None:
+        return None
+    return {
+        "data": base64.b64encode(ic.data).decode("ascii"),
+        "bg": [list(c) for c in ic.bg_colors],
+        "bgAlpha": ic.bg_alpha,
+        "lightDirs": [list(d) for d in ic.light_dirs],
+        "lightColors": [list(c) for c in ic.light_colors],
+        "ambient": list(ic.ambient),
+    }
+
+
+def icons(slot: str, paths_json: str) -> str:
+    """3D icons of PS2 save folders, read on demand (the tree does not include them).
+
+    Returns ``{"icons": {path: icon | null}}``; null means the save has no
+    icon (no icon.sys, or the icon file it names is missing).
+    """
+
+    def run():
+        s = _slot(slot)
+        c = _ps2(slot)
+        if s.icons_version != s.version:
+            s.icons, s.icons_version = {}, s.version
+        out = {}
+        for path in json.loads(paths_json):
+            if path not in s.icons:
+                s.icons[path] = _icon_dict(c.icon(path))
+            out[path] = s.icons[path]
+        return {"icons": out}
+
+    return _result(run)
 
 
 def mkdir(slot: str, path: str) -> str:

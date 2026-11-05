@@ -292,3 +292,75 @@ def test_fast_fat_matches_mymc_on_samples():
             continue
         orig, fast = _orig_vs_fast(p)
         assert fast == orig, p
+
+
+def _icon_sys(icon_name: str, title: bytes = b"TEST SAVE") -> bytes:
+    from mymcplusplus.ps2iconsys import _icon_sys_struct
+
+    return _icon_sys_struct.pack(
+        b"PS2D", 0, len(title), 0, 0x40,
+        *([0x80, 0x40, 0x20, 0] * 4),
+        *([0.5, 0.5, 0.5, 0] * 3),
+        *([1.0, 0.5, 0.25, 0] * 3), 0.25, 0.5, 0.75, 0,
+        title, icon_name.encode(), icon_name.encode(), icon_name.encode(), b"",
+    )
+
+
+def test_save_icon(raw_card):
+    ico = b"\x00\x00\x01\x00" + os.urandom(200)
+    with raw_card.edit() as ed:
+        ed.mkdir("/BASLUS-00001ICON")
+        ed.write_file("/BASLUS-00001ICON/icon.sys", _icon_sys("game.ico"))
+        ed.write_file("/BASLUS-00001ICON/game.ico", ico)
+        ed.mkdir("/BASLUS-00002CASE")  # icon.sys names the file with another case
+        ed.write_file("/BASLUS-00002CASE/icon.sys", _icon_sys("GAME.ICO"))
+        ed.write_file("/BASLUS-00002CASE/game.ico", ico)
+        ed.mkdir("/BASLUS-00003MISSING")
+        ed.write_file("/BASLUS-00003MISSING/icon.sys", _icon_sys("gone.ico"))
+        ed.mkdir("/BASLUS-00004NOSYS")
+        ed.write_file("/BASLUS-00004NOSYS/data.bin", b"x")
+        ed.mkdir("/BASLUS-00005BADSYS")
+        ed.write_file("/BASLUS-00005BADSYS/icon.sys", b"junk")
+    ic = raw_card.icon("/BASLUS-00001ICON")
+    assert ic.data == ico
+    assert ic.bg_colors[0] == (0x80, 0x40, 0x20) and ic.bg_alpha == 0x40
+    assert ic.light_colors[0] == (1.0, 0.5, 0.25) and ic.ambient == (0.25, 0.5, 0.75)
+    assert raw_card.icon("/BASLUS-00002CASE").data == ico
+    for d in ("/BASLUS-00003MISSING", "/BASLUS-00004NOSYS", "/BASLUS-00005BADSYS"):
+        assert raw_card.icon(d) is None
+
+
+@pytest.mark.skipif(not (SAMPLES / "MemoryCards/PS2/BOOT/BootCard-1.mcd").exists(), reason="no sample SD")
+def test_save_icon_real_card(tmp_path):
+    import shutil
+
+    p = tmp_path / "BootCard-1.mcd"
+    shutil.copy(SAMPLES / "MemoryCards/PS2/BOOT/BootCard-1.mcd", p)
+    with MemoryCard(p, make_backups=False) as c:
+        found = {e.name: c.icon(e.path) for e in c.tree() if e.is_dir}
+    assert found["APPS"].data[:4] == b"\x00\x00\x01\x00"
+    assert found["BADATA-SYSTEM"] is None  # its icon.sys names a file that is not there
+
+
+def test_web_api_icons(tmp_path, monkeypatch):
+    import base64
+    from psmm import web_api
+
+    monkeypatch.setattr(web_api, "WORK", tmp_path / "w")
+    monkeypatch.setattr(web_api, "INCOMING", tmp_path / "w" / "incoming.bin")
+    web_api.INCOMING.parent.mkdir(parents=True)
+    c = MemoryCard.create(web_api.INCOMING, 8, ecc=False)
+    with c.edit() as ed:
+        ed.mkdir("/BASLUS-00001ICON")
+        ed.write_file("/BASLUS-00001ICON/icon.sys", _icon_sys("a.ico"))
+        ed.write_file("/BASLUS-00001ICON/a.ico", b"ICON")
+        ed.mkdir("/PLAIN")
+    c.close()
+    assert json.loads(web_api.open_card("A", "c.mcd"))["ok"]
+    try:
+        r = json.loads(web_api.icons("A", json.dumps(["/BASLUS-00001ICON", "/PLAIN"])))
+        assert r["ok"] and r["icons"]["/PLAIN"] is None
+        assert base64.b64decode(r["icons"]["/BASLUS-00001ICON"]["data"]) == b"ICON"
+        assert len(r["icons"]["/BASLUS-00001ICON"]["lightDirs"]) == 3
+    finally:
+        web_api.close_card("A")

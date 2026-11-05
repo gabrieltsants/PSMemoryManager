@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { LANGS, detectLang, getLang, locale, setLang, t, translateDom } from "./i18n.js?v=__BUILD__";
+import { IconRenderer, isAnimated, parseIcon } from "./ps2icon.js?v=__BUILD__";
 
 // Build id of this page (filled in by tools/build_site.py). Every asset URL
 // carries it, so a new deploy never mixes old and new files.
@@ -160,6 +161,188 @@ setInterval(() => {
     img.src = f[iconTick % f.length];
   });
 }, 280);
+
+// ---------------------------------------------------------------------------
+// PS2 save icons: 3D models read on demand after the tree is shown (the card
+// opens just as fast). Rows get a still thumbnail; the details panel the
+// animated model on the icon.sys background. Saves without an icon (no
+// icon.sys, missing or broken icon file) keep the generic save symbol.
+
+const ps2Icons = {
+  data: new Map(), // key -> {icon, look} | null (no usable icon)
+  thumbs: new Map(), // key -> data URL | null
+  pending: new Set(), // keys being fetched
+  thumbR: undefined, // shared off-screen renderer; null = no WebGL
+};
+const THUMB_PX = 48;
+// same save content -> same key, also across the two panes and after undo
+const iconKey = (e) => `${e.path}|${e.modified}|${e.size}|${e.files}`;
+const hasPs2Icon = (p, e) => e.dir && !!e.title && p.parentOf.get(e.path) === "/";
+
+function ps2IconRecord(raw) {
+  if (!raw) return null;
+  try {
+    const bin = atob(raw.data);
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return { icon: parseIcon(u8), look: raw };
+  } catch {
+    return null;
+  }
+}
+
+function thumbRenderer() {
+  if (ps2Icons.thumbR === undefined) {
+    try {
+      const c = document.createElement("canvas");
+      c.width = c.height = THUMB_PX;
+      ps2Icons.thumbR = new IconRenderer(c);
+    } catch {
+      ps2Icons.thumbR = null;
+    }
+  }
+  return ps2Icons.thumbR;
+}
+
+function makeThumb(key) {
+  const rec = ps2Icons.data.get(key);
+  const r = rec && thumbRenderer();
+  let url = null;
+  if (r) {
+    try {
+      r.setIcon(rec.icon, rec.look);
+      if (r.draw({ yaw: -0.35, pitch: 0.12 })) url = r.canvas.toDataURL();
+    } catch { url = null; }
+  }
+  if (ps2Icons.thumbs.size > 800) ps2Icons.thumbs.clear();
+  ps2Icons.thumbs.set(key, url);
+  return url;
+}
+
+function ps2RowIcon(p, e) {
+  const url = hasPs2Icon(p, e) ? ps2Icons.thumbs.get(iconKey(e)) : null;
+  if (url) return `<span class="ricon ps2"><img class="ps2-icon" alt="" draggable="false" src="${url}"></span>`;
+  const icon = e.dir ? (e.title ? "save" : "folder") : "file";
+  return `<span class="ricon${icon === "save" ? " save" : ""}">${svg(icon)}</span>`;
+}
+
+// fetches the icons of the given entries (in small batches, so other actions are not held up)
+async function fetchPs2Icons(p, entries) {
+  const todo = entries.filter((e) => !ps2Icons.data.has(iconKey(e)) && !ps2Icons.pending.has(iconKey(e)));
+  if (!todo.length) return;
+  todo.forEach((e) => ps2Icons.pending.add(iconKey(e)));
+  const summary = p.summary;
+  try {
+    for (let i = 0; i < todo.length; i += 8) {
+      const chunk = todo.slice(i, i + 8);
+      if (p.summary !== summary) break;
+      const r = ok(await rpc("icons", [p.slot, chunk.map((e) => e.path)]));
+      for (const e of chunk) {
+        const key = iconKey(e);
+        ps2Icons.data.set(key, ps2IconRecord(r.icons[e.path]));
+        ps2Icons.pending.delete(key);
+        const url = makeThumb(key);
+        if (url && p.summary === summary) {
+          const span = p.tree.querySelector(`.row[data-path="${CSS.escape(e.path)}"] .ricon`);
+          if (span) span.outerHTML = ps2RowIcon(p, e);
+        }
+        if (P() === p && !state.dual && p.selected.size === 1 && p.selected.has(e.path)) mountPs2View(p, e);
+        await new Promise((r) => setTimeout(r, 0)); // let clicks and scrolling through between icons
+      }
+    }
+  } catch { /* card closed or replaced meanwhile: the next render asks again */ }
+  todo.forEach((e) => ps2Icons.pending.delete(iconKey(e)));
+}
+
+function queuePs2Icons(p) {
+  if (!p.summary || isPs1(p)) return;
+  // first time: check for WebGL after the tree is on screen; without a GPU, no icons at all
+  if (ps2Icons.thumbR === undefined) {
+    if (!ps2Icons.probe) ps2Icons.probe = setTimeout(() => { thumbRenderer(); for (const q of Object.values(panes)) queuePs2Icons(q); }, 30);
+    return;
+  }
+  if (!ps2Icons.thumbR) return;
+  const list = p.summary.tree.filter((e) => hasPs2Icon(p, e));
+  for (const e of list) {
+    const key = iconKey(e);
+    if (ps2Icons.data.has(key) && !ps2Icons.thumbs.has(key)) makeThumb(key);
+  }
+  fetchPs2Icons(p, list);
+}
+
+// details panel: one persistent WebGL canvas, animated and draggable
+const ps2View = { canvas: null, r: null, key: null, start: 0, yaw: 0, pitch: 0.1, drag: null, raf: 0, spin: true };
+
+function ps2ViewInit() {
+  if (ps2View.r !== null || ps2View.canvas) return ps2View.r;
+  const c = document.createElement("canvas");
+  c.className = "ps2-view";
+  ps2View.canvas = c;
+  try { ps2View.r = new IconRenderer(c); } catch { ps2View.r = null; return null; }
+  c.addEventListener("pointerdown", (ev) => {
+    ps2View.drag = { x: ev.clientX, y: ev.clientY, yaw: ps2View.yaw, pitch: ps2View.pitch };
+    ps2View.spin = false;
+    c.setPointerCapture(ev.pointerId);
+  });
+  c.addEventListener("pointermove", (ev) => {
+    const d = ps2View.drag;
+    if (!d) return;
+    ps2View.yaw = d.yaw + (ev.clientX - d.x) / 60;
+    ps2View.pitch = Math.max(-1.2, Math.min(1.2, d.pitch + (ev.clientY - d.y) / 60));
+    ps2ViewFrame();
+  });
+  const end = () => { ps2View.drag = null; };
+  c.addEventListener("pointerup", end);
+  c.addEventListener("pointercancel", end);
+  c.addEventListener("dblclick", () => { ps2View.yaw = 0; ps2View.pitch = 0.1; ps2View.spin = true; ps2ViewLoop(); });
+  return ps2View.r;
+}
+
+function ps2ViewFrame(now = performance.now()) {
+  const r = ps2View.r;
+  if (!r || !ps2View.canvas.isConnected) return false;
+  const size = Math.round(ps2View.canvas.clientWidth * (window.devicePixelRatio || 1)) || 320;
+  if (ps2View.canvas.width !== size) ps2View.canvas.width = ps2View.canvas.height = size;
+  return r.draw({ time: (now - ps2View.start) / 1000, yaw: ps2View.yaw, pitch: ps2View.pitch, background: true });
+}
+
+function ps2ViewLoop() {
+  cancelAnimationFrame(ps2View.raf);
+  let last = performance.now();
+  const tick = (now) => {
+    if (!ps2View.canvas?.isConnected) return;
+    const still = reduceMotion?.matches;
+    if (!document.hidden) {
+      if (ps2View.spin && !still) ps2View.yaw += ((now - last) / 1000) * 0.6;
+      ps2ViewFrame(still ? ps2View.start : now);
+    }
+    last = now;
+    const r = ps2View.r;
+    if (!still && (ps2View.spin || (r?.icon && isAnimated(r.icon)))) ps2View.raf = requestAnimationFrame(tick);
+  };
+  ps2View.raf = requestAnimationFrame(tick);
+}
+
+// puts the 3D icon of ``e`` in the details panel (fetching it first if needed)
+function mountPs2View(p, e) {
+  const slot = document.querySelector("#details .ps2-slot");
+  if (!slot || slot.dataset.path !== e.path) return;
+  const key = iconKey(e);
+  if (!ps2Icons.data.has(key)) { fetchPs2Icons(p, [e]); return; }
+  const rec = ps2Icons.data.get(key);
+  const r = rec && ps2ViewInit();
+  if (!r) { slot.remove(); return; }
+  if (ps2View.key !== key) {
+    try { r.setIcon(rec.icon, rec.look); } catch { slot.remove(); return; }
+    ps2View.key = key;
+    ps2View.start = performance.now();
+    ps2View.yaw = 0; ps2View.pitch = 0.1; ps2View.spin = true;
+  }
+  slot.replaceChildren(ps2View.canvas);
+  slot.classList.add("ready");
+  ps2ViewFrame();
+  ps2ViewLoop();
+}
 
 // [7, 8, 10, 11, 12] -> "7–8, 10–12"
 function blockRanges(blocks) {
@@ -484,13 +667,12 @@ function renderTree(p) {
       const cls = ["row"];
       if (p.selected.has(e.path)) cls.push("selected");
       if (p.focus === e.path) cls.push("focused");
-      const icon = e.dir ? (e.title ? "save" : "folder") : "file";
       rows.push(
         `<div class="${cls.join(" ")}" role="treeitem" draggable="true" aria-level="${depth + 1}" aria-selected="${p.selected.has(e.path)}"` +
         `${e.dir ? ` aria-expanded="${open}"` : ""} data-path="${esc(e.path)}">` +
         `<div class="c-name" style="padding-left:${8 + depth * 20}px">` +
         `<span class="twisty${open ? " open" : ""}${hasKids ? "" : " leaf"}" data-twisty>${svg("chevron")}</span>` +
-        `<span class="ricon${icon === "save" ? " save" : ""}">${svg(icon)}</span>` +
+        ps2RowIcon(p, e) +
         `<span class="nm" title="${esc(e.name)}">${esc(e.name)}</span>` +
         `${e.protected ? `<span class="lock" title="${esc(t("tree.protected"))}">${svg("lock")}</span>` : ""}` +
         `</div>` +
@@ -504,6 +686,7 @@ function renderTree(p) {
   };
   walk(p.summary.tree, 0);
   p.tree.innerHTML = rows.length ? rows.join("") : `<div class="tree-empty">${esc(t("tree.empty"))}</div>`;
+  queuePs2Icons(p);
 }
 
 function dl(rows) {
@@ -591,9 +774,12 @@ function renderDetails(p) {
   if (e.dir) rows.push([t("det.files"), String(e.files)]);
   rows.push([t("det.created"), fmtDate(e.created)], [t("det.modified"), fmtDate(e.modified)]);
   if (e.attrs) rows.push([t("det.attrs"), e.attrs]);
+  const view = ps2Icons.thumbR && hasPs2Icon(p, e) && ps2Icons.data.get(iconKey(e)) !== null;
   el.innerHTML =
+    (view ? `<div class="ps2-slot" data-path="${esc(e.path)}" title="${esc(t("det.ps2.iconTip"))}"></div>` : "") +
     `<h2>${esc(e.title || e.name)}</h2><div class="path">${esc(e.path)}</div>` + dl(rows) +
     (e.protected ? `<div class="warnbox">${esc(t("det.protectedWarn"))}</div>` : "");
+  if (view) mountPs2View(p, e);
 }
 
 // selected root-level folders that only contain files (= exportable saves); PS1: the selected saves not deleted

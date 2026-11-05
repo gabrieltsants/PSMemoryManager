@@ -29,6 +29,10 @@
 
 Pastas de save têm nomes como `BASLUS-20963…`: `B` + letra da região (`A` América, `E` Europa, `I` Japão, `K` Coreia, `C` China) + código do jogo. Saves copiados para a raiz de outro cartão mantêm datas e atributos, inclusive a marca de "protegido" do FreeMcBoot.
 
+### Ícones dos saves de PS2
+
+O `icon.sys` de cada save aponta o arquivo do ícone (`.ico`/`.icn`): um modelo 3D pequeno com uma textura de 128×128 (crua ou comprimida em RLE) e, em alguns jogos, uma animação que mistura várias formas. O `icon.sys` também define as cores do fundo e as três luzes. A página lê os ícones depois de mostrar o cartão e desenha com WebGL: uma miniatura parada na lista e o modelo animado no painel de detalhes (arraste para girar). Saves sem `icon.sys`, ou com o arquivo do ícone faltando ou quebrado, ficam com o símbolo genérico de save. Navegadores sem WebGL acelerado por hardware também ficam com o símbolo genérico, porque desenhar os modelos por software travaria a página.
+
 ## Memory cards de PS1
 
 Um cartão de PS1 tem 128 KB: 16 blocos de 8 KB. O bloco 0 é o diretório; os blocos 1–15 guardam saves, e um save ocupa um ou mais blocos (nem sempre vizinhos). O primeiro bloco de cada save tem o título (em Shift-JIS, então títulos em japonês aparecem certos) e um ícone de 16×16 com 1 a 3 quadros de animação.

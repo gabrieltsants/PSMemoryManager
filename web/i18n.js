@@ -65,6 +65,7 @@ const STRINGS = {
     "det.type.save": "Save / game folder", "det.type.dir": "Folder", "det.type.file": "File",
     "det.size": "Size", "det.onCard": "{size} on card", "det.bytes": "{size} ({bytes} bytes)",
     "det.files": "Files", "det.created": "Created", "det.modified": "Modified", "det.attrs": "Attributes",
+    "det.ps2.iconTip": "Save icon. Drag to turn it; double-click to reset.",
     "det.protectedWarn": "Protected folder (e.g. FreeMcBoot/PS2BBL). Deleting or changing it may stop the console from booting from the card.",
 
     "dlg.cancel": "Cancel", "dlg.ok": "OK",
@@ -378,6 +379,7 @@ const STRINGS = {
     "det.type.save": "Save / pasta de jogo", "det.type.dir": "Pasta", "det.type.file": "Arquivo",
     "det.size": "Tamanho", "det.onCard": "{size} no cartão", "det.bytes": "{size} ({bytes} bytes)",
     "det.files": "Arquivos", "det.created": "Criado", "det.modified": "Modificado", "det.attrs": "Atributos",
+    "det.ps2.iconTip": "Ícone do save. Arraste para girar; clique duas vezes para voltar.",
     "det.protectedWarn": "Pasta protegida (ex.: FreeMcBoot/PS2BBL). Apagar ou alterar pode impedir o console de iniciar pelo cartão.",
 
     "dlg.cancel": "Cancelar", "dlg.ok": "OK",
