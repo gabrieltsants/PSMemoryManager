@@ -4,13 +4,10 @@
 // Web Worker: loads Pyodide + mymc++ + the psmm core and serves requests from
 // the page. Everything runs locally in the browser; no file leaves the PC.
 
+// Pyodide is part of the site (tools/build_site.py copies it to pyodide/): no
+// other server is needed. Keep in step with VERSION in tools/fetch_pyodide.py.
 const PYODIDE_VERSION = "0.27.2";
-// tools/build_site.py --offline sets this to true: the local app ships Pyodide
-// next to the page, so it works without internet
-const PYODIDE_LOCAL = false;
-const PYODIDE_URL = PYODIDE_LOCAL
-  ? new URL("pyodide/", self.location.href).href
-  : `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
+const PYODIDE_URL = new URL("pyodide/", self.location.href).href;
 const BUILD = "__BUILD__"; // filled in by tools/build_site.py
 
 importScripts(PYODIDE_URL + "pyodide.js");

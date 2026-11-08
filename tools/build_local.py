@@ -5,7 +5,7 @@
 
     python tools/build_local.py [--target linux-x86_64] ... [--archive]
 
-Builds the site in offline mode (Pyodide included), gzips every file into
+Builds the site (Pyodide included), gzips every file into
 ``launcher/site/`` and compiles ``launcher/`` with Go into ``dist/``. Needs Go
 1.22+; the result runs without anything installed. Without ``--target`` it
 builds every target. ``--archive`` also packs each one for download
@@ -43,7 +43,7 @@ def pack_site() -> None:
             shutil.rmtree(old) if old.is_dir() else old.unlink()
     with tempfile.TemporaryDirectory() as tmp:
         site = Path(tmp) / "site"
-        build_site.build(site, offline=True)
+        build_site.build(site)
         for f in sorted(p for p in site.rglob("*") if p.is_file()):
             out = dest / (f.relative_to(site).as_posix() + ".gz")
             out.parent.mkdir(parents=True, exist_ok=True)

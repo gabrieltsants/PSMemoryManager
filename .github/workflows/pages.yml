@@ -37,6 +37,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: .cache
+          key: pyodide-${{ hashFiles('tools/fetch_pyodide.py') }}
       - run: python tools/build_site.py _site
       - name: Publish to gh-pages
         working-directory: _site

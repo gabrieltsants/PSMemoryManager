@@ -38,6 +38,8 @@ The page needs to be served over HTTP (not opened as a file), because it loads P
 
 `.github/workflows/pages.yml` runs the tests and, if they pass, builds the site and pushes it to the `gh-pages` branch (served by GitHub Pages) on every push to `main`.
 
+Pyodide is published with the site (`pyodide/`, about 14 MB, served gzipped: about 5.8 MB on a first visit), so the page needs no other server. `tools/fetch_pyodide.py` downloads it from the official npm package, pinned by version and SHA-256, into `.cache/` (cached in CI). To change the Pyodide version, update `VERSION` and both hashes there and `PYODIDE_VERSION` in `web/worker.js`; the build refuses to run if they differ.
+
 `tools/build_site.py` stamps a build id (a hash of the site's content) into every asset URL (`app.js?v=<id>`) and writes `version.json`. Source files use the `__BUILD__` placeholder, and any new asset URL or `fetch` in `web/` must carry `?v=__BUILD__`. The page checks `version.json` when it opens, when the tab becomes visible again and every 10 minutes. On a new deploy it reloads by itself if nothing is open, or shows an "update now" bar, so open cards are never lost.
 
 ## Local app
@@ -49,8 +51,7 @@ python tools/build_local.py --target linux-x86_64   # or no --target for every s
 ./dist/PSMemoryManager-<version>-linux-x86_64       # --no-browser, --port N, --version
 ```
 
-- `tools/build_local.py` builds the site with `build_site.py --offline`, gzips every file into `launcher/site/` and compiles `launcher/` into `dist/`. The executable is static (no CGO).
-- `--offline` copies Pyodide into the site and switches `PYODIDE_LOCAL` in `web/worker.js`, so nothing comes from the CDN. `tools/fetch_pyodide.py` downloads it from the official npm package, pinned by version and SHA-256, into `.cache/`. Keep its `VERSION` in step with `PYODIDE_VERSION` in `web/worker.js` (the build checks).
+- `tools/build_local.py` builds the site with `build_site.py` (the same site as GitHub Pages, Pyodide included), gzips every file into `launcher/site/` and compiles `launcher/` into `dist/`. The executable is static (no CGO).
 - The launcher listens on `127.0.0.1:47820` only. The port is fixed so the browser keeps the language and theme; if the port is taken by another program it uses a free one, and if PSMemoryManager is already running it just opens the browser again. It answers only requests whose `Host` is its own address (against DNS rebinding) and only `GET`/`HEAD`.
 - Files are stored gzipped and sent as they are (`Content-Encoding: gzip`), with the build as ETag.
 - The page gets a small script (`/__psmm/local.js`) that keeps a Server-Sent Events connection open. The app quits 45 s after the last tab closes (5 min if no tab ever connects). If it is gone, the page shows a note: what is open keeps working, since everything runs in the browser, but reloading needs the app again.

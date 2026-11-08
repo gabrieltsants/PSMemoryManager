@@ -62,7 +62,7 @@ Funciona em computadores e celulares, nos temas claro e escuro, em português ou
 
 ## Como usar
 
-1. [Abra o PSMemoryManager](https://gabrieltsants.github.io/PSMemoryManager/) e espere carregar (na primeira visita são baixados uns 10 MB; nas próximas é instantâneo).
+1. [Abra o PSMemoryManager](https://gabrieltsants.github.io/PSMemoryManager/) e espere carregar (na primeira visita são baixados uns 6 MB; nas próximas leva cerca de um segundo).
 2. Clique em **Abrir** e escolha o arquivo do memory card, ou arraste-o para a página.
 3. Selecione saves para ver os detalhes. Use a barra de ferramentas ou o botão direito do mouse para as ações.
 4. Clique em **Salvar** quando terminar. Nada muda no seu arquivo até você salvar.
@@ -95,4 +95,4 @@ Atalhos: `/` buscar · `Ctrl+O` abrir · `Ctrl+S` salvar · `Ctrl+Z` desfazer ·
 
 ## Créditos e licença
 
-GPLv3. Usa o [mymc++](https://github.com/Adubbz/mymcplusplus), de Florian Märkl e outros, baseado no mymc de Ross Ridge (também GPLv3). O suporte a PS1 segue o [MemcardRex](https://github.com/ShendoXT/memcardrex) e o [vita-mcr2vmp](https://github.com/dots-tb/vita-mcr2vmp) (GPLv3). Os títulos dos jogos vêm do [GameIndex.yaml do PCSX2](https://github.com/PCSX2/pcsx2/blob/master/bin/resources/GameIndex.yaml) (GPLv3). O aplicativo local inclui o [Pyodide](https://pyodide.org) (MPL-2.0). Inspirado no [mcd_viewer](https://github.com/gamebitfunx/mcdviewer), feito para o PSxMemCard Gen2. Os créditos completos estão nos [detalhes técnicos](docs/formats.pt-BR.md#créditos).
+GPLv3. Usa o [mymc++](https://github.com/Adubbz/mymcplusplus), de Florian Märkl e outros, baseado no mymc de Ross Ridge (também GPLv3). O suporte a PS1 segue o [MemcardRex](https://github.com/ShendoXT/memcardrex) e o [vita-mcr2vmp](https://github.com/dots-tb/vita-mcr2vmp) (GPLv3). Os títulos dos jogos vêm do [GameIndex.yaml do PCSX2](https://github.com/PCSX2/pcsx2/blob/master/bin/resources/GameIndex.yaml) (GPLv3). Inclui o [Pyodide](https://pyodide.org) (MPL-2.0), que roda o Python no navegador. Inspirado no [mcd_viewer](https://github.com/gamebitfunx/mcdviewer), feito para o PSxMemCard Gen2. Os créditos completos estão nos [detalhes técnicos](docs/formats.pt-BR.md#créditos).

@@ -62,7 +62,7 @@ Just open or drag the file: PSMemoryManager recognizes the format by itself. The
 
 ## How to use
 
-1. [Open PSMemoryManager](https://gabrieltsants.github.io/PSMemoryManager/) and wait for it to load (the first visit downloads about 10 MB; later visits are instant).
+1. [Open PSMemoryManager](https://gabrieltsants.github.io/PSMemoryManager/) and wait for it to load (the first visit downloads about 6 MB; later visits take about a second).
 2. Click **Open** and pick a memory card file, or drag it onto the page.
 3. Select saves to see their details. Use the toolbar or right-click for the actions.
 4. Click **Save** when you are done. Nothing changes in your file until you save.
@@ -95,4 +95,4 @@ Shortcuts: `/` search · `Ctrl+O` open · `Ctrl+S` save · `Ctrl+Z` undo · `Ctr
 
 ## Credits and license
 
-GPLv3. Uses [mymc++](https://github.com/Adubbz/mymcplusplus) by Florian Märkl and others, based on Ross Ridge's mymc (also GPLv3). PS1 support follows [MemcardRex](https://github.com/ShendoXT/memcardrex) and [vita-mcr2vmp](https://github.com/dots-tb/vita-mcr2vmp) (GPLv3). Game titles come from PCSX2's [GameIndex.yaml](https://github.com/PCSX2/pcsx2/blob/master/bin/resources/GameIndex.yaml) (GPLv3). The local app includes [Pyodide](https://pyodide.org) (MPL-2.0). Inspired by [mcd_viewer](https://github.com/gamebitfunx/mcdviewer), made for the PSxMemCard Gen2. Full credits are in the [technical details](docs/formats.md#credits).
+GPLv3. Uses [mymc++](https://github.com/Adubbz/mymcplusplus) by Florian Märkl and others, based on Ross Ridge's mymc (also GPLv3). PS1 support follows [MemcardRex](https://github.com/ShendoXT/memcardrex) and [vita-mcr2vmp](https://github.com/dots-tb/vita-mcr2vmp) (GPLv3). Game titles come from PCSX2's [GameIndex.yaml](https://github.com/PCSX2/pcsx2/blob/master/bin/resources/GameIndex.yaml) (GPLv3). Includes [Pyodide](https://pyodide.org) (MPL-2.0), which runs Python in the browser. Inspired by [mcd_viewer](https://github.com/gamebitfunx/mcdviewer), made for the PSxMemCard Gen2. Full credits are in the [technical details](docs/formats.md#credits).
