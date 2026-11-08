@@ -1,0 +1,19 @@
+{
+  "version": "0.1.2",
+  "wheel": "py/mymcplusplus-3.2.0-py3-none-any.whl",
+  "files": [
+    "psmm/__init__.py",
+    "psmm/web_api.py",
+    "psmm/core/__init__.py",
+    "psmm/core/formats.py",
+    "psmm/core/card.py",
+    "psmm/core/backup.py",
+    "psmm/core/i18n.py",
+    "psmm/core/saves.py",
+    "psmm/core/sdcard.py",
+    "psmm/core/ecc.py",
+    "psmm/core/convert.py",
+    "psmm/core/ps1.py",
+    "psmm/core/signing.py"
+  ]
+}

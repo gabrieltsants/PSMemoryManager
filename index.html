@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PSMemoryManager</title>
+  <meta name="description" content="PS2 and PS1 memory card manager in the browser: PSxMemCard Gen2, OPL VMC, PCSX2, MemCard PRO2, DexDrive, PSP/Vita and emulators.">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <meta name="psmm-build" content="26c72f47abbf">
+  <link rel="stylesheet" href="style.css?v=26c72f47abbf">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="icon.svg" alt="" width="28" height="28">
+      <span class="brand-name">PSMemoryManager</span>
+      <span class="badge">beta</span>
+    </div>
+    <div class="topbar-right">
+      <span id="engine" class="engine" data-i18n-title="engine.title">
+        <span class="dot"></span><span id="engineText" data-i18n="engine.loading"></span>
+      </span>
+      <label class="lang">
+        <span class="sr-only" data-i18n="lang.label"></span>
+        <select id="langSel" data-i18n-title="lang.label" data-i18n-aria="lang.label"></select>
+      </label>
+      <button id="themeBtn" class="icon-btn" data-i18n-aria="theme.label"></button>
+    </div>
+  </header>
+
+  <nav class="toolbar" id="toolbar" data-i18n-aria="toolbar.label">
+    <div class="group">
+      <button data-act="sd" data-i18n-title="act.sd.tip"><i data-icon="sd"></i><span data-i18n="act.sd"></span></button>
+      <button data-act="open" data-i18n-title="act.open.tip"><i data-icon="open"></i><span data-i18n="act.open"></span></button>
+      <button data-act="new" data-i18n-title="act.new.tip"><i data-icon="card"></i><span data-i18n="act.new"></span></button>
+      <button data-act="save" data-i18n-title="act.save.tip" class="primary"><i data-icon="save-disk"></i><span data-i18n="act.save"></span></button>
+      <button data-act="saveAs" data-i18n-title="act.saveAs.tip"><i data-icon="download"></i><span data-i18n="act.saveAs"></span></button>
+      <button data-act="undo" data-i18n-title="act.undo.tip"><i data-icon="undo"></i><span data-i18n="act.undo"></span></button>
+    </div>
+    <div class="group">
+      <button data-act="addFiles" data-i18n-title="act.addFiles.tip"><i data-icon="add-file"></i><span data-i18n="act.addFiles"></span></button>
+      <button data-act="addFolder" data-i18n-title="act.addFolder.tip"><i data-icon="import-folder"></i><span data-i18n="act.addFolder"></span></button>
+      <button data-act="mkdir" data-i18n-title="act.mkdir.tip"><i data-icon="add-folder"></i><span data-i18n="act.mkdir"></span></button>
+    </div>
+    <div class="group">
+      <button data-act="extract" data-i18n-title="act.extract.tip"><i data-icon="extract"></i><span data-i18n="act.extract"></span></button>
+      <button data-act="rename" data-i18n-title="act.rename.tip"><i data-icon="rename"></i><span data-i18n="act.rename"></span></button>
+      <button data-act="delete" data-i18n-title="act.delete.tip" class="danger"><i data-icon="delete"></i><span data-i18n="act.delete"></span></button>
+    </div>
+    <div class="group">
+      <button data-act="importSave" data-i18n-title="act.importSave.tip2"><i data-icon="import-save"></i><span data-i18n="act.importSave"></span></button>
+      <button data-act="exportSave" data-i18n-title="act.exportSave.tip"><i data-icon="export-save"></i><span data-i18n="act.exportSave"></span></button>
+    </div>
+    <div class="group">
+      <button data-act="dual" data-i18n-title="act.dual.tip" aria-pressed="false"><i data-icon="columns"></i><span data-i18n="act.dual"></span></button>
+      <button data-act="copy" data-i18n-title="act.copy.tip"><i data-icon="copy"></i><span data-i18n="act.copy"></span></button>
+      <button data-act="compare" data-i18n-title="act.compare.tip" aria-pressed="false"><i data-icon="compare"></i><span data-i18n="act.compare"></span></button>
+    </div>
+    <div class="group">
+      <button data-act="convert" data-i18n-title="act.convert.tip"><i data-icon="convert"></i><span data-i18n="act.convert"></span></button>
+      <button data-act="resize" data-i18n-title="act.resize.tip"><i data-icon="resize"></i><span data-i18n="act.resize"></span></button>
+      <button data-act="split" data-i18n-title="act.split.tip"><i data-icon="split"></i><span data-i18n="act.split"></span></button>
+      <button data-act="check" data-i18n-title="act.check.tip"><i data-icon="check"></i><span data-i18n="act.check"></span></button>
+    </div>
+  </nav>
+
+  <main id="main">
+    <section id="empty" class="empty">
+      <div class="drop-hint">
+        <div class="empty-icon"><img src="icon.svg" alt="" width="72" height="72"></div>
+        <h1 data-i18n="empty.title"></h1>
+        <p class="muted" data-i18n-html="empty.drop"></p>
+        <div class="empty-actions">
+          <button class="btn primary" data-act="open" data-i18n="empty.open"></button>
+          <button class="btn" data-act="sd" data-i18n="empty.sd"></button>
+          <button class="btn" data-act="new" data-i18n="empty.new"></button>
+        </div>
+        <ul class="facts">
+          <li data-i18n-html="empty.fact1"></li>
+          <li data-i18n="empty.fact2"></li>
+          <li data-i18n="empty.fact3"></li>
+          <li data-i18n-html="empty.fact4"></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="workspace" class="workspace" hidden>
+      <div id="layout" class="layout">
+        <aside id="sdbar" class="sdbar" hidden></aside>
+        <div id="panes" class="panes"></div>
+        <aside id="details" class="details" aria-live="polite"></aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="statusbar">
+    <span id="status"></span>
+    <span class="muted">PSMemoryManager · GPLv3 · <span data-i18n="footer.uses"></span> <a href="https://github.com/Adubbz/mymcplusplus" target="_blank" rel="noopener">mymc++</a> · <a href="https://github.com/gabrieltsants/PSMemoryManager" target="_blank" rel="noopener">GitHub</a></span>
+  </footer>
+
+  <div id="dropOverlay" class="drop-overlay" hidden><div id="dropText"></div></div>
+  <div id="menu" class="menu" hidden role="menu"></div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <dialog id="dialog"><form method="dialog" id="dialogForm"></form></dialog>
+
+  <input type="file" id="pickCard" accept=".mcd,.bin,.vmc,.ps2,.mc2,.mcr,.gme,.vmp,.vgs,.mem,.srm,.mc,.ps,.psm,.ddf,.mci,.vm1" hidden>
+  <input type="file" id="pickFiles" multiple hidden>
+  <input type="file" id="pickFolder" webkitdirectory hidden>
+  <input type="file" id="pickSaves" multiple hidden>
+  <input type="file" id="pickSdDir" webkitdirectory hidden>
+
+  <template id="paneTpl">
+    <div class="pane">
+      <div class="cardbar">
+        <div class="cardbar-main">
+          <div class="cardbar-title">
+            <span class="slot-badge"></span>
+            <span class="card-name"></span>
+            <span class="dirty" hidden></span>
+            <button class="icon-btn small close-card" data-pane-act="close"></button>
+          </div>
+          <div class="chips"></div>
+        </div>
+        <div class="capacity">
+          <div class="capacity-text"><span class="used"></span><span class="free muted"></span></div>
+          <div class="bar"><div class="bar-fill"></div></div>
+          <div class="blockmap" hidden></div>
+        </div>
+      </div>
+      <div class="cmp-bar" hidden></div>
+      <div class="tree-wrap">
+        <div class="tree-filter">
+          <span class="filter-icon" aria-hidden="true"></span>
+          <input type="search" class="filter" data-i18n-placeholder="filter.placeholder" data-i18n-aria="filter.label" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="tree-head" role="row">
+          <button data-sort="name" class="col-name" data-i18n="col.name"></button>
+          <button data-sort="title" class="col-title" data-i18n="col.title"></button>
+          <button data-sort="size" class="col-size" data-i18n="col.size"></button>
+          <button data-sort="modified" class="col-date" data-i18n="col.modified"></button>
+        </div>
+        <div class="tree" role="tree" tabindex="0" aria-multiselectable="true"></div>
+      </div>
+      <div class="pane-empty" hidden>
+        <div class="empty-icon"><img src="icon.svg" alt="" width="48" height="48"></div>
+        <h2 data-i18n="pane.emptyTitle"></h2>
+        <p class="muted" data-i18n="pane.emptyText"></p>
+        <div class="empty-actions">
+          <button class="btn primary" data-pane-act="open" data-i18n="empty.open"></button>
+          <button class="btn" data-pane-act="new" data-i18n="empty.new"></button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <div id="updateBar" class="update-bar" hidden role="status">
+    <span data-i18n="update.available"></span>
+    <button class="btn primary" id="updateBtn" data-i18n="update.reload"></button>
+  </div>
+
+  <script src="app.js?v=26c72f47abbf" type="module"></script>
+</body>
+</html>
