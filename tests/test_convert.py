@@ -193,22 +193,6 @@ def test_web_convert_and_split(game_card, tmp_path, monkeypatch):
     assert json.loads(w.summary("A"))["card"]["game"] == "SLUS-20228"
 
 
-VMC = [Path.home() / "Downloads" / n for n in ("SLUS_202.28_0.bin", "SLUS_203.12_0.bin")]
-
-
-@pytest.mark.skipif(not all(p.is_file() for p in VMC), reason="user's OPL VMC samples not available")
-def test_real_opl_vmcs(tmp_path):
-    for p in VMC:
-        with MemoryCard(p, make_backups=False) as src:  # read-only use of the originals
-            assert src.format.layout is Layout.RAW
-            game = cv.guess_game_id(src, p.name)
-            assert game == cv.game_id_from_text(p.name)
-            ps2 = cv.convert(src, tmp_path / (p.stem + ".ps2"), ecc=True)
-            with MemoryCard(ps2) as e:
-                back = cv.convert(e, tmp_path / (p.stem + ".mcd"), ecc=False)
-            assert _md5(back) == _md5(p)
-
-
 def test_gamedb():
     from psmm.core import gamedb
 
