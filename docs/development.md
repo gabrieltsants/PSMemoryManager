@@ -47,7 +47,7 @@ Pyodide is published with the site (`pyodide/`, about 14 MB, served gzipped: abo
 The local app is the same page in a single executable, for people who prefer not to use the website. It needs nothing installed and works without internet.
 
 ```bash
-python tools/build_local.py --target linux-x86_64   # or no --target for every system; needs Go 1.22+
+python tools/build_local.py --target linux-x86_64   # or windows-x86_64, linux-arm64, windows-arm64; no --target: all. Needs Go 1.22+
 ./dist/PSMemoryManager-<version>-linux-x86_64       # --no-browser, --port N, --version
 ```
 

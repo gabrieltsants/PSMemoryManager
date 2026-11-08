@@ -23,7 +23,7 @@ jobs:
         run: |
           pip install mymcplusplus==3.2.0 pytest
           pytest -q
-          (cd launcher && go vet ./... && go test ./...)
+          (cd launcher && go vet ./... && GOOS=windows go vet ./... && go test ./...)
       - name: Check the tag matches the version
         run: |
           v=$(python -c "import psmm; print(psmm.__version__)")
@@ -33,24 +33,32 @@ jobs:
           path: .cache
           key: pyodide-${{ hashFiles('tools/fetch_pyodide.py') }}
       - name: Build
-        run: python tools/build_local.py --target linux-x86_64 --target linux-arm64 --archive
+        run: python tools/build_local.py --archive  # every target: Linux and Windows, x86-64 and ARM64
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > notes.md <<'NOTES'
-          **Local app (Linux)** — the same PSMemoryManager as the website, in one file that needs nothing installed and works without internet.
+          **Local app (Windows and Linux)** — the same PSMemoryManager as the website, in one file that needs nothing installed and works without internet.
 
-          1. Download the file for your computer: `linux-x86_64` (most PCs) or `linux-arm64` (Raspberry Pi and other ARM boards).
-          2. Extract it and double-click **PSMemoryManager** (or run `./PSMemoryManager` in a terminal). Your browser opens with the app.
-          3. It closes by itself shortly after you close its browser tab.
+          1. Download the file for your computer:
+             - Windows: `windows-x86_64.zip` (most PCs) or `windows-arm64.zip` (ARM laptops).
+             - Linux: `linux-x86_64.tar.gz` (most PCs) or `linux-arm64.tar.gz` (Raspberry Pi and other ARM boards).
+          2. Extract it and double-click **PSMemoryManager**. Your browser opens with the app.
+          3. It closes by itself shortly after you close its browser tab (on Windows, closing its small window also closes it).
+
+          On Windows, the first time, "Windows protected your PC" may show up because the app is not signed: click **More info**, then **Run anyway**.
 
           ---
 
-          **Aplicativo local (Linux)** — o mesmo PSMemoryManager do site, em um arquivo só, sem instalar nada e sem precisar de internet.
+          **Aplicativo local (Windows e Linux)** — o mesmo PSMemoryManager do site, em um arquivo só, sem instalar nada e sem precisar de internet.
 
-          1. Baixe o arquivo do seu computador: `linux-x86_64` (a maioria dos PCs) ou `linux-arm64` (Raspberry Pi e outras placas ARM).
-          2. Extraia e dê dois cliques em **PSMemoryManager** (ou rode `./PSMemoryManager` no terminal). O navegador abre com o aplicativo.
-          3. Ele fecha sozinho logo depois que você fecha a aba do navegador.
+          1. Baixe o arquivo do seu computador:
+             - Windows: `windows-x86_64.zip` (a maioria dos PCs) ou `windows-arm64.zip` (notebooks ARM).
+             - Linux: `linux-x86_64.tar.gz` (a maioria dos PCs) ou `linux-arm64.tar.gz` (Raspberry Pi e outras placas ARM).
+          2. Extraia e dê dois cliques em **PSMemoryManager**. O navegador abre com o aplicativo.
+          3. Ele fecha sozinho logo depois que você fecha a aba do navegador (no Windows, fechar a janelinha dele também fecha).
+
+          No Windows, na primeira vez, pode aparecer "O Windows protegeu o computador", porque o aplicativo não tem assinatura digital: clique em **Mais informações** e depois em **Executar assim mesmo**.
           NOTES
-          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz --title "PSMemoryManager $GITHUB_REF_NAME" --notes-file notes.md
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.zip --title "PSMemoryManager $GITHUB_REF_NAME" --notes-file notes.md

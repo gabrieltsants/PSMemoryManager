@@ -116,6 +116,9 @@ func main() {
 	fmt.Println("Open in your browser / Abra no navegador:", url)
 	fmt.Println("It closes by itself shortly after you close its browser tab (or press Ctrl+C).")
 	fmt.Println("Fecha sozinho logo depois que você fechar a aba do navegador (ou aperte Ctrl+C).")
+	if quitHint != "" {
+		fmt.Println(quitHint)
+	}
 
 	srv := &http.Server{Handler: s, ReadHeaderTimeout: 10 * time.Second}
 	go s.watch(srv)

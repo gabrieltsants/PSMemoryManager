@@ -6,7 +6,7 @@ Um **gerenciador de memory cards de PlayStation 2 e PlayStation 1 que roda no na
 
 **[Abrir o PSMemoryManager](https://gabrieltsants.github.io/PSMemoryManager/)** — sem instalação.
 
-Prefere um programa no computador? **[Baixe o aplicativo local](https://github.com/gabrieltsants/PSMemoryManager/releases/latest)** (Linux; Windows em breve): o mesmo PSMemoryManager em um arquivo só, sem instalar nada e sem precisar de internet.
+Prefere um programa no computador? **[Baixe o aplicativo local](https://github.com/gabrieltsants/PSMemoryManager/releases/latest)** (Windows e Linux): o mesmo PSMemoryManager em um arquivo só, sem instalar nada e sem precisar de internet.
 
 > Seus arquivos nunca saem do computador: tudo é processado no navegador. Nada é enviado a um servidor.
 
@@ -71,11 +71,15 @@ Funciona em computadores e celulares, nos temas claro e escuro, em português ou
 
 ### Aplicativo local (sem internet)
 
-1. [Baixe o aplicativo local](https://github.com/gabrieltsants/PSMemoryManager/releases/latest) do seu computador: `linux-x86_64` para a maioria dos PCs, `linux-arm64` para Raspberry Pi ou outra placa ARM.
-2. Extraia e dê dois cliques em **PSMemoryManager** (ou rode `./PSMemoryManager` no terminal). O navegador abre com o aplicativo, igualzinho ao site.
-3. Quando terminar, é só fechar a aba do navegador: o aplicativo fecha sozinho logo depois.
+1. [Baixe o aplicativo local](https://github.com/gabrieltsants/PSMemoryManager/releases/latest) do seu computador:
+   - **Windows:** `windows-x86_64.zip` (a maioria dos PCs) ou `windows-arm64.zip` (notebooks ARM).
+   - **Linux:** `linux-x86_64.tar.gz` (a maioria dos PCs) ou `linux-arm64.tar.gz` (Raspberry Pi e outras placas ARM).
+2. Extraia e dê dois cliques em **PSMemoryManager** (no Linux também dá para rodar `./PSMemoryManager` no terminal). O navegador abre com o aplicativo, igualzinho ao site.
+3. Quando terminar, é só fechar a aba do navegador: o aplicativo fecha sozinho logo depois. No Windows, fechar a janelinha preta dele também fecha.
 
-Ele roda só no seu computador: nenhum outro aparelho da rede consegue acessá-lo. Uma versão para Windows vem em breve.
+No Windows, na primeira vez, pode aparecer uma janela azul "O Windows protegeu o computador", porque o aplicativo não tem assinatura digital: clique em **Mais informações** e depois em **Executar assim mesmo**.
+
+Ele roda só no seu computador: nenhum outro aparelho da rede consegue acessá-lo.
 
 ### Bom saber
 

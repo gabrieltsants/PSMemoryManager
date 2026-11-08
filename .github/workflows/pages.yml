@@ -24,7 +24,7 @@ jobs:
           go-version: "1.22"
       - name: Local app launcher
         working-directory: launcher
-        run: go vet ./... && go test ./...
+        run: go vet ./... && GOOS=windows go vet ./... && go test ./...
 
   publish:
     # Builds the site and pushes it to the gh-pages branch (served by GitHub Pages)

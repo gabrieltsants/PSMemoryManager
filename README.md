@@ -6,7 +6,7 @@ A **PlayStation 2 and PlayStation 1 memory card manager that runs in your browse
 
 **[Open PSMemoryManager](https://gabrieltsants.github.io/PSMemoryManager/)** — nothing to install.
 
-Prefer a program on your computer? **[Download the local app](https://github.com/gabrieltsants/PSMemoryManager/releases/latest)** (Linux; Windows coming soon): the same PSMemoryManager in a single file, nothing to install and no internet needed.
+Prefer a program on your computer? **[Download the local app](https://github.com/gabrieltsants/PSMemoryManager/releases/latest)** (Windows and Linux): the same PSMemoryManager in a single file, nothing to install and no internet needed.
 
 > Your files never leave your computer: everything is processed in the browser. Nothing is uploaded to a server.
 
@@ -71,11 +71,15 @@ Just open or drag the file: PSMemoryManager recognizes the format by itself. The
 
 ### Local app (without internet)
 
-1. [Download the local app](https://github.com/gabrieltsants/PSMemoryManager/releases/latest) for your computer: `linux-x86_64` for most PCs, `linux-arm64` for a Raspberry Pi or another ARM board.
-2. Extract it and double-click **PSMemoryManager** (or run `./PSMemoryManager` in a terminal). Your browser opens with the app, exactly like the website.
-3. When you are done, just close the browser tab: the app closes by itself shortly after.
+1. [Download the local app](https://github.com/gabrieltsants/PSMemoryManager/releases/latest) for your computer:
+   - **Windows:** `windows-x86_64.zip` (most PCs) or `windows-arm64.zip` (ARM laptops).
+   - **Linux:** `linux-x86_64.tar.gz` (most PCs) or `linux-arm64.tar.gz` (Raspberry Pi and other ARM boards).
+2. Extract it and double-click **PSMemoryManager** (on Linux you can also run `./PSMemoryManager` in a terminal). Your browser opens with the app, exactly like the website.
+3. When you are done, just close the browser tab: the app closes by itself shortly after. On Windows, closing its small black window also closes it.
 
-It only runs on your computer: no other device on the network can reach it. A Windows version is coming soon.
+On Windows, the first time, a blue "Windows protected your PC" window may show up, because the app is not signed: click **More info** and then **Run anyway**.
+
+It only runs on your computer: no other device on the network can reach it.
 
 ### Good to know
 

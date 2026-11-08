@@ -11,6 +11,9 @@ import (
 	"runtime"
 )
 
+// started from a terminal (or a file manager, without a window): Ctrl+C quits
+const quitHint = ""
+
 // openBrowser opens url in the default browser (xdg-open on Linux, open on macOS).
 func openBrowser(url string) {
 	cmd := "xdg-open"

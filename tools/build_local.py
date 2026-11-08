@@ -9,7 +9,7 @@ Builds the site (Pyodide included), gzips every file into
 ``launcher/site/`` and compiles ``launcher/`` with Go into ``dist/``. Needs Go
 1.22+; the result runs without anything installed. Without ``--target`` it
 builds every target. ``--archive`` also packs each one for download
-(``.tar.gz`` on Linux, which keeps the file executable).
+(``.tar.gz`` on Linux, which keeps the file executable; ``.zip`` on Windows).
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,6 +30,8 @@ LAUNCHER = ROOT / "launcher"
 TARGETS = {  # name -> (GOOS, GOARCH, file suffix)
     "linux-x86_64": ("linux", "amd64", ""),
     "linux-arm64": ("linux", "arm64", ""),
+    "windows-x86_64": ("windows", "amd64", ".exe"),
+    "windows-arm64": ("windows", "arm64", ".exe"),
 }
 
 sys.path.insert(0, str(ROOT / "tools"))
@@ -62,7 +65,14 @@ def compile_target(name: str, version: str) -> Path:
 
 
 def archive(binary: Path, name: str, version: str) -> Path:
-    """dist/PSMemoryManager-<version>-<target>.tar.gz with an executable PSMemoryManager inside."""
+    """dist/PSMemoryManager-<version>-<target>.tar.gz (or .zip on Windows) with the app inside."""
+    if TARGETS[name][0] == "windows":
+        out = ROOT / "dist" / f"PSMemoryManager-{version}-{name}.zip"
+        info = zipfile.ZipInfo("PSMemoryManager.exe", date_time=(1980, 1, 1, 0, 0, 0))
+        info.compress_type = zipfile.ZIP_DEFLATED
+        with zipfile.ZipFile(out, "w") as z:
+            z.writestr(info, binary.read_bytes())
+        return out
     out = ROOT / "dist" / f"PSMemoryManager-{version}-{name}.tar.gz"
     info = tarfile.TarInfo("PSMemoryManager")
     info.size, info.mode, info.mtime = binary.stat().st_size, 0o755, 0
