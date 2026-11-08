@@ -18,7 +18,7 @@ const STRINGS = {
     "load.pyodide": "Downloading Python (Pyodide)…",
     "load.mymc": "Installing mymc++…",
     "load.core": "Loading PSMemoryManager…",
-    "load.cache": "The first visit downloads ~10 MB (cached afterwards).",
+    "load.cache": "Loading Python. The first visit downloads about 6 MB; later visits take about a second.",
     "theme.label": "Theme",
     "theme.auto": "Theme: automatic",
     "theme.light": "Theme: light",
@@ -120,6 +120,8 @@ const STRINGS = {
     "name.chars": "Characters not allowed: / \\ ? * : \" < > |",
 
     "st.ready": "Ready.", "st.readyOpen": "Ready. Open or drag a memory card.",
+    "st.loading": "{step} You can already open a card: it opens as soon as Python is ready.",
+    "st.waitEngine": "{step} It carries on as soon as Python is ready…",
     "st.error": "Error.", "st.cancelled": "Cancelled.",
     "st.opening": "Opening {name}…", "st.opened": "{name} opened.",
     "st.creating": "Creating card…", "st.created": "Card created.",
@@ -140,7 +142,6 @@ const STRINGS = {
     "toast.permission": "Write permission denied.",
     "toast.added": "Added to {dir}: {what}.",
     "toast.checkOk": "No errors found in the file system.",
-    "toast.wait": "Wait for the engine to finish loading.",
     "toast.notCard": "This does not look like a PS2 or PS1 memory card (.mcd, .bin, .vmc, .ps2, .mc2, .mcr, .gme, .vmp…).",
     "toast.unknown": "Unknown error.",
 
@@ -378,7 +379,7 @@ const STRINGS = {
     "load.pyodide": "Baixando o Python (Pyodide)…",
     "load.mymc": "Instalando o mymc++…",
     "load.core": "Carregando o PSMemoryManager…",
-    "load.cache": "Na primeira visita são baixados ~10 MB (fica em cache).",
+    "load.cache": "Carregando o Python. Na primeira visita são baixados uns 6 MB; nas próximas leva cerca de um segundo.",
     "theme.label": "Tema",
     "theme.auto": "Tema: automático",
     "theme.light": "Tema: claro",
@@ -480,6 +481,8 @@ const STRINGS = {
     "name.chars": "Caracteres não permitidos: / \\ ? * : \" < > |",
 
     "st.ready": "Pronto.", "st.readyOpen": "Pronto. Abra ou arraste um memory card.",
+    "st.loading": "{step} Você já pode abrir um cartão: ele abre assim que o Python estiver pronto.",
+    "st.waitEngine": "{step} Continua assim que o Python estiver pronto…",
     "st.error": "Erro.", "st.cancelled": "Cancelado.",
     "st.opening": "Abrindo {name}…", "st.opened": "{name} aberto.",
     "st.creating": "Criando cartão…", "st.created": "Cartão criado.",
@@ -500,7 +503,6 @@ const STRINGS = {
     "toast.permission": "Permissão de escrita negada.",
     "toast.added": "Adicionado em {dir}: {what}.",
     "toast.checkOk": "Nenhum erro encontrado no sistema de arquivos.",
-    "toast.wait": "Aguarde o motor terminar de carregar.",
     "toast.notCard": "Isso não parece um memory card de PS2 ou PS1 (.mcd, .bin, .vmc, .ps2, .mc2, .mcr, .gme, .vmp…).",
     "toast.unknown": "Erro desconhecido.",
 

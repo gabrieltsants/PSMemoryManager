@@ -86,6 +86,10 @@ a { color: var(--accent); }
 .engine .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
 .engine.ready .dot { background: var(--ok); }
 .engine.error .dot { background: var(--danger); }
+/* still loading: the dot pulses until Python is ready (then it turns green) */
+.engine:not(.ready):not(.error) .dot { animation: engine-pulse 1.1s ease-in-out infinite; }
+@keyframes engine-pulse { 50% { opacity: .35; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .engine .dot { animation: none !important; } }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .lang select {
   font: inherit; font-size: 13px; color: var(--text); background: var(--surface); cursor: pointer;
@@ -368,9 +372,6 @@ dialog input[type="text"].mono { font-family: ui-monospace, Consolas, monospace;
 .toast.error { border-left-color: var(--danger); }
 @keyframes toast-in { from { transform: translateY(8px); opacity: 0; } }
 
-.loading { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(2px); }
-.loading-box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px 28px; text-align: center; display: grid; gap: 10px; justify-items: center; box-shadow: var(--shadow); max-width: calc(100vw - 32px); }
-.spinner { width: 30px; height: 30px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 dialog {

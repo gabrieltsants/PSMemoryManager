@@ -372,8 +372,8 @@ worker.onmessage = (ev) => {
   const m = ev.data;
   if (m.type === "progress") {
     loadStep = m.step;
-    $("#loadingText").textContent = t(m.step);
     $("#engineText").textContent = t(m.step);
+    if (!state.busy) status("st.loading", { step: t(m.step) });
     return;
   }
   const p = pending.get(m.id);
@@ -391,13 +391,20 @@ function rpc(op, args = [], transfer = []) {
   });
 }
 
+// Resolves when Python is ready. The page can be used before that: actions
+// started meanwhile wait for it (see run()), and the worker queues requests.
+let engineReadyOk, engineReadyFail;
+const engineReady = new Promise((resolve, reject) => { engineReadyOk = resolve; engineReadyFail = reject; });
+engineReady.catch(() => {}); // handled where it is awaited
+
 let engineError = null;
 function engineFailed(msg) {
   engineError = msg;
   $("#engine").classList.add("error");
   $("#engineText").textContent = t("engine.error");
-  $("#loadingText").textContent = t("engine.failed", { error: msg });
-  document.querySelector(".spinner")?.remove();
+  $("#engine").title = t("engine.failed", { error: msg });
+  status("engine.failed", { error: msg });
+  engineReadyFail(new Error(t("engine.failed", { error: msg })));
 }
 
 // JSON result coming from Python
@@ -524,9 +531,14 @@ async function run(statusKey, params, fn) {
   if (state.busy) return;
   state.busy = true;
   document.body.style.cursor = "progress";
-  status(statusKey, params);
   updateActions();
   try {
+    if (!state.ready) {
+      // started before Python finished loading: it carries on by itself when it is ready
+      status("st.waitEngine", { step: t(loadStep) });
+      await engineReady;
+    }
+    status(statusKey, params);
     return await fn();
   } catch (e) {
     toast(e.message || String(e), "error");
@@ -938,13 +950,13 @@ function updateActions() {
   const ps1 = isPs1(p);
   const ro = has && p.summary.card.readOnly;
   const en = {
-    open: state.ready, new: state.ready,
+    open: true, new: true,
     save: has && p.summary.dirty, saveAs: has, undo: has && p.summary.canUndo,
     addFiles: has && !ps1, addFolder: has && !ps1, mkdir: has && !ps1,
     extract: has && !ps1, rename: has && !ps1 && sel === 1,
     delete: has && sel > 0 && !ro && (!ps1 || selectedSaves(p).length > 0), check: has,
-    importSave: state.ready && !ro, exportSave: has && selectedSaves(p).length > 0,
-    dual: state.ready, compare: canCompare(), copy: canCopy(p), sd: state.ready, convert: has, split: has && !ro, resize: has && !ps1,
+    importSave: !ro, exportSave: has && selectedSaves(p).length > 0,
+    dual: true, compare: canCompare(), copy: canCopy(p), sd: true, convert: has, split: has && !ro, resize: has && !ps1,
     restore: has && selectedRestorable(p).length > 0,
   };
   document.querySelectorAll("[data-act]").forEach((b) => {
@@ -1773,7 +1785,6 @@ document.addEventListener("drop", async (ev) => {
   dragDepth = 0; overlay.hidden = true;
   const { pane: target, dir } = dropTarget(ev);
   highlight(null);
-  if (!state.ready) { toast(t("toast.wait"), "error"); return; }
   const p = target || P();
   const files = [...ev.dataTransfer.files];
   const items = [...(ev.dataTransfer.items || [])];
@@ -2833,7 +2844,11 @@ function applyLanguage() {
   $("#status").textContent = t(statusMsg.key, statusMsg.params);
   if (engineError) engineFailed(engineError);
   else if (state.ready) $("#engineText").textContent = t("engine.ready", { version: state.python });
-  else { $("#engineText").textContent = t(loadStep); $("#loadingText").textContent = t(loadStep); }
+  else {
+    $("#engineText").textContent = t(loadStep);
+    $("#engine").title = t("load.cache");
+    if (!state.busy && statusMsg.key === "st.loading") status("st.loading", { step: t(loadStep) });
+  }
   render();
 }
 
@@ -2861,16 +2876,17 @@ window.addEventListener("beforeunload", warnUnsaved);
 for (const slot of SLOTS) panes[slot] = makePane(slot);
 setLang(detectLang());
 paintIcons();
-status("st.ready");
+status("st.loading", { step: t(loadStep) });
 applyLanguage();
 rpc("ready").then(async (info) => {
   await rpc("setLang", [getLang()]);
   state.ready = true;
   state.python = info.python;
-  $("#loading").hidden = true;
   $("#engine").classList.add("ready");
+  $("#engine").title = t("engine.title");
   $("#engineText").textContent = t("engine.ready", { version: info.python });
-  status("st.readyOpen");
+  if (!state.busy) status("st.readyOpen"); // an action started while loading sets its own status
+  engineReadyOk();
   updateActions();
   checkForUpdate();
 }).catch((e) => engineFailed(e.message));
