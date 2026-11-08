@@ -28,6 +28,8 @@ The page needs to be served over HTTP (not opened as a file), because it loads P
 - `psmm/web_api.py`: bridge used by the web page. Every function returns JSON.
 - `psmm/cli.py`: command line.
 - `web/`: the page (HTML/CSS/JS, no build step). Pyodide runs in a Web Worker (`worker.js`). UI strings are in `web/i18n.js`.
+  - Start-up: starting Python takes 2–3 s even when everything is in the browser cache. After the first visit, the worker keeps a memory snapshot of Python with `psmm.web_api` already imported (Pyodide's `_makeSnapshot`/`_loadSnapshot`, about 20 MB in Cache Storage under `psmm-python-snapshot`), and later visits restore it in about 0.5 s. The snapshot is tied to the build id and the Pyodide version and is replaced when either changes. If it cannot be read or restored, the worker drops it and starts Python the normal way. The core's files are still written to Pyodide's file system after a restore, because they live outside Python's memory.
+  - The worker fetches the core's files in parallel with Python. Their URLs carry the build id, so the browser cache serves them without asking the server again.
 - `launcher/`: the local app (Go). One executable that embeds the page and serves it on 127.0.0.1; see [Local app](#local-app).
 - `tools/`: `build_site.py` (site build), `build_local.py` and `fetch_pyodide.py` (local app), `update_gamedb.py` (regenerates `psmm/data/gamedb.json` from PCSX2's GameIndex), `readme_media.py` (README screenshots and GIF).
 - `tests/`: pytest suite. `tests/data/ps1/` holds real PS1 files (see its README). Some tests also use a Gen2 SD card dump at `~/psxmemcard_novo` (or `PSMM_SAMPLES`) and are skipped without it.

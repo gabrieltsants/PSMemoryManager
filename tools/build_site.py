@@ -106,6 +106,13 @@ def _add_pyodide(out: Path) -> None:
     if LOCAL_FLAG not in text:
         sys.exit(f"{LOCAL_FLAG!r} not found in web/worker.js")
     worker.write_text(text.replace(LOCAL_FLAG, "const PYODIDE_LOCAL = true;"), encoding="utf-8")
+    # nothing comes from the CDN offline: no early connection to it either
+    page = out / "index.html"
+    html = page.read_text(encoding="utf-8")
+    html = re.sub(r"\s*<!-- Python \(Pyodide\) comes from this CDN.*?-->\s*<link rel=\"preconnect\"[^>]*>", "", html, flags=re.S)
+    if "cdn.jsdelivr.net" in html:
+        sys.exit("index.html: could not remove the CDN preconnect for the offline build")
+    page.write_text(html, encoding="utf-8")
     src = fetch_pyodide.ensure()
     (out / "pyodide").mkdir()
     for name in fetch_pyodide.FILES:

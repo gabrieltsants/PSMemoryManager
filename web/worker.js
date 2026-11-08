@@ -22,26 +22,104 @@ function progress(step) {
   self.postMessage({ type: "progress", step });
 }
 
-async function boot() {
-  progress("load.pyodide");
-  py = await loadPyodide({ indexURL: PYODIDE_URL });
+// ---------------------------------------------------------------------------
+// Start-up. Starting Python is the slow part (2-3 s even with everything in
+// the browser cache), so after the first visit the worker keeps a memory
+// snapshot of Python with the core already imported, and later visits
+// restore it (~0.5 s). The snapshot belongs to this exact build and Pyodide
+// version; anything odd and the worker just starts Python the normal way.
 
-  progress("load.mymc");
-  const manifest = await (await fetch(`py/manifest.json?v=${BUILD}`, { cache: "no-cache" })).json();
-  const wheel = await (await fetch(`${manifest.wheel}?v=${BUILD}`)).arrayBuffer();
-  py.unpackArchive(wheel, "wheel");
+const SNAP_CACHE = "psmm-python-snapshot";
+const SNAP_KEY = `snapshot-${PYODIDE_VERSION}-${BUILD}`;
 
-  progress("load.core");
-  for (const rel of manifest.files) {
-    const src = await (await fetch(`py/${rel}?v=${BUILD}`, { cache: "no-cache" })).text();
+async function readSnapshot() {
+  try {
+    const hit = await (await caches.open(SNAP_CACHE)).match(SNAP_KEY);
+    return hit ? new Uint8Array(await hit.arrayBuffer()) : null;
+  } catch {
+    return null; // no Cache Storage (private window, blocked storage)
+  }
+}
+
+async function storeSnapshot(bytes) {
+  try {
+    await caches.delete(SNAP_CACHE); // only the current build's snapshot is kept
+    await (await caches.open(SNAP_CACHE)).put(SNAP_KEY, new Response(bytes));
+  } catch { /* no storage: next visit starts the normal way */ }
+}
+
+async function dropSnapshot() {
+  try { await caches.delete(SNAP_CACHE); } catch { /* nothing to drop */ }
+}
+
+// Our Python files, all fetched at once (their URLs carry the build id, so the
+// browser cache can serve them as they are)
+async function fetchCore() {
+  const get = async (url, kind) => {
+    const r = await fetch(`${url}?v=${BUILD}`);
+    if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
+    return r[kind]();
+  };
+  const manifest = await get("py/manifest.json", "json");
+  const [wheel, files] = await Promise.all([
+    get(manifest.wheel, "arrayBuffer"),
+    Promise.all(manifest.files.map(async (rel) => [rel, await get(`py/${rel}`, "text")])),
+  ]);
+  return { manifest, wheel, files };
+}
+
+// writes mymc++ and the core into Python's file system (also after a snapshot:
+// files live outside Python's memory, and something may be imported later)
+function installCore(core) {
+  py.unpackArchive(core.wheel, "wheel");
+  for (const [rel, src] of core.files) {
     const dest = "/home/pyodide/" + rel;
     py.FS.mkdirTree(dest.slice(0, dest.lastIndexOf("/")));
     py.FS.writeFile(dest, src);
   }
-  py.runPython("import sys; sys.path.insert(0, '/home/pyodide')");
+}
+
+function finish(core) {
   api = py.pyimport("psmm.web_api");
   py.FS.mkdirTree("/psmm");
-  return { version: manifest.version, python: py.runPython("import sys; sys.version.split()[0]") };
+  return { version: core.manifest.version, python: py.runPython("import sys; sys.version.split()[0]") };
+}
+
+async function boot() {
+  progress("load.pyodide");
+  const corePromise = fetchCore(); // downloads alongside Python
+  corePromise.catch(() => {}); // awaited below; avoid an "unhandled" warning meanwhile
+  const snapshot = await readSnapshot();
+  if (snapshot) {
+    try {
+      py = await loadPyodide({ indexURL: PYODIDE_URL, _loadSnapshot: snapshot });
+      progress("load.core");
+      const core = await corePromise;
+      installCore(core);
+      if (!py.runPython("import sys; 'psmm.web_api' in sys.modules")) throw new Error("core missing");
+      return finish(core);
+    } catch (e) {
+      console.warn("PSMemoryManager: saved Python state not usable, starting normally", e);
+      await dropSnapshot();
+      py = api = null;
+    }
+  }
+
+  py = await loadPyodide({ indexURL: PYODIDE_URL, _makeSnapshot: true });
+  progress("load.mymc");
+  const core = await corePromise;
+  installCore(core);
+  progress("load.core");
+  py.runPython("import sys; sys.path.insert(0, '/home/pyodide')\nimport psmm.web_api");
+  let bytes = null;
+  try {
+    bytes = py.makeMemorySnapshot(); // before any Python object is handed to JS
+  } catch (e) {
+    console.warn("PSMemoryManager: could not save Python's state", e);
+  }
+  const result = finish(core);
+  if (bytes) storeSnapshot(bytes); // in the background: the page is already usable
+  return result;
 }
 
 const ready = boot();
